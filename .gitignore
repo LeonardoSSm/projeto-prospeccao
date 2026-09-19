@@ -1,0 +1,30 @@
+# Local environment and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+*credentials*
+*secret*
+
+# Weekly analysis runtime artifacts
+automation/weekly-analysis/reports/
+automation/weekly-analysis/state/
+automation/weekly-analysis/logs/
+automation/weekly-analysis/tmp/
+
+# Common generated files
+node_modules/
+dist/
+build/
+coverage/
+.cache/
+.turbo/
+.next/
+target/
+.pnpm-store/
+*.log
+.DS_Store
+Thumbs.db

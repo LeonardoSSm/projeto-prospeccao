@@ -1,0 +1,147 @@
+name: prospector
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-prospector}
+      POSTGRES_USER: ${POSTGRES_USER:-prospector}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-prospector}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-prospector}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-prospector}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-prospector}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: quay.io/minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-prospector}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-prospector123}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio-init:
+    image: quay.io/minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    restart: "no"
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 ${MINIO_ROOT_USER:-prospector} ${MINIO_ROOT_PASSWORD:-prospector123} &&
+      mc mb --ignore-existing local/${S3_BUCKET:-prospector-artifacts}
+      "
+
+  n8n:
+    image: n8nio/n8n:latest
+    ports:
+      - "5678:5678"
+    volumes:
+      - n8n-data:/home/node/.n8n
+      - ./automation/n8n:/home/node/workflows
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./deploy/observability/otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+
+  core-api-migrate:
+    build:
+      context: .
+      dockerfile: apps/core-api/Dockerfile
+    working_dir: /workspace
+    command: ["apps/core-api/node_modules/.bin/prisma", "migrate", "deploy", "--schema", "apps/core-api/prisma/schema.prisma"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://prospector:prospector@postgres:5432/prospector}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  core-api:
+    build:
+      context: .
+      dockerfile: apps/core-api/Dockerfile
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env.local
+    environment:
+      PORT: 8080
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      core-api-migrate:
+        condition: service_completed_successfully
+
+  audit-worker:
+    build:
+      context: .
+      dockerfile: apps/audit-worker/Dockerfile
+    env_file:
+      - .env.local
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080/api/v1}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - core-api
+
+volumes:
+  postgres-data:
+  minio-data:
+  n8n-data:

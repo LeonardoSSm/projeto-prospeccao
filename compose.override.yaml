@@ -1,0 +1,33 @@
+# Aplicado automaticamente pelo `docker compose` junto de compose.yaml.
+# Monta o código-fonte como volume e troca o comando de cada app pelo modo watch,
+# permitindo hot-reload sem exigir Node/pnpm instalados no host.
+
+services:
+  core-api:
+    build:
+      target: build
+    command: ["pnpm", "--filter", "@prospector/core-api", "run", "dev"]
+    volumes:
+      - ./apps/core-api:/workspace/apps/core-api
+      - /workspace/apps/core-api/node_modules
+    working_dir: /workspace
+
+  audit-worker:
+    build:
+      target: build
+    command: ["pnpm", "--filter", "@prospector/audit-worker", "run", "dev"]
+    volumes:
+      - ./apps/audit-worker:/workspace/apps/audit-worker
+      - /workspace/apps/audit-worker/node_modules
+    working_dir: /workspace
+
+  web:
+    build:
+      target: deps
+    command: ["pnpm", "--filter", "@prospector/web", "run", "dev"]
+    volumes:
+      - ./apps/web:/workspace/apps/web
+      - /workspace/apps/web/node_modules
+    working_dir: /workspace
+    ports:
+      - "3000:3000"

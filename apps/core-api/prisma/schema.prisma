@@ -1,0 +1,52 @@
+// Modelo inicial (Fase 0 / V001): apenas o módulo Identity & Access.
+// Convenções: docs/DOCUMENTATION.md seção 3.1.
+// IDs são UUIDv7 gerados pela aplicação (lib `uuidv7`), nunca por default do banco —
+// por isso os campos `id` não usam @default(uuid()) do Prisma (que gera UUIDv4).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Organization {
+  id        String   @id @db.Uuid
+  name      String
+  slug      String   @unique
+  status    String   @default("ACTIVE")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  memberships Membership[]
+
+  @@map("organizations")
+}
+
+model User {
+  id          String   @id @db.Uuid
+  oidcSubject String   @unique @map("oidc_subject")
+  email       String
+  displayName String   @map("display_name")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  memberships Membership[]
+
+  @@map("users")
+}
+
+model Membership {
+  id             String @id @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  userId         String @map("user_id") @db.Uuid
+  role           String
+  status         String @default("ACTIVE")
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  user         User         @relation(fields: [userId], references: [id])
+
+  @@unique([organizationId, userId])
+  @@index([organizationId, role, status])
+  @@map("memberships")
+}
