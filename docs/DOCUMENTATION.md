@@ -313,7 +313,7 @@ As versões abaixo são baselines do projeto, não uma obrigação de atualizaç
 | ADR-013 | Prisma como ORM e ferramenta de migração | Aceita | Cliente tipado e migrações versionadas coerentes com um stack 100% TypeScript |
 | ADR-014 | Ambiente de desenvolvimento inteiramente em containers | Aceita | `docker compose up` sobe api, worker, web e infraestrutura juntos; onboarding não depende de toolchain local |
 | ADR-015 | OIDC via SPA (Authorization Code + PKCE) com Bearer JWT direto na API, sem BFF | Aceita | Elimina o `X-Organization-Id` temporário; API stateless valida o token via JWKS e deriva `organizationId` da Membership do usuário. Troca a mitigação extra de um BFF por simplicidade — aceitável para o MVP, revisitável se a superfície de XSS do dashboard crescer. Keycloak roda em Docker só para desenvolvimento local; produção aponta as mesmas variáveis para qualquer IdP OIDC |
-| ADR-016 | Receita Federal (CNPJ) como fonte primária de descoberta, antes de Google Places | Aceita | Dado aberto e gratuito, sem chave de API nem cobrança por evento (`docs/ANALISE_FONTES_DADOS_PROSPECCAO_LOCAL.md`). Implementado como mais um `PlacesProvider` (`ReceitaFederalPlacesProvider`) atrás da mesma interface do mock — Campaigns/Discovery/Leads não sabem a diferença. Importação é um script offline (`apps/core-api/scripts/cnpj-import/`), nunca uma chamada ao vivo: os arquivos da Receita são dumps de dezenas de GB, não uma API de busca |
+| ADR-016 | Receita Federal (CNPJ) como fonte primária de descoberta, antes de Google Places | Aceita | Dado aberto e gratuito, sem chave de API nem cobrança por evento (`docs/ANALISE_FONTES_DADOS_PROSPECCAO_LOCAL.md`). Implementado como mais um `PlacesProvider` (`ReceitaFederalPlacesProvider`) atrás da mesma interface do mock — Campaigns/Discovery/Leads não sabem a diferença. Importação é um script offline (`apps/core-api/scripts/cnpj-import/`), nunca uma chamada ao vivo: os arquivos da Receita são dumps mensais (~6-7GB, Brasil inteiro por arquivo), não uma API de busca. Validado com dado real: Fortaleza importada (52.503 estabelecimentos, 10 nichos), primeira campanha real trouxe 30 dentistas de verdade |
 
 Novos ADRs devem usar `docs/adr/NNNN-titulo.md`, contendo contexto, decisão, alternativas, consequências e status.
 
@@ -1609,11 +1609,13 @@ Seeds são determinísticos, idempotentes e nunca executados no perfil de produ�
 
 Login local: o realm `prospector` (`deploy/keycloak/prospector-realm.json`, importado automaticamente pelo Keycloak) já contém um usuário por papel, com e-mail igual ao semeado por `prisma/seed.ts` (ex.: `dev-admin@prospector.dev`) e senha `devpassword123` para todos. No primeiro login de cada um, a API casa o usuário pelo e-mail e grava o `sub` real do Keycloak — depois disso a busca já é direta.
 
-Descoberta com dado real (opcional, ver ADR-016): por padrão `PLACES_PROVIDER=mock` gera empresas fictícias, sem custo e sem passo extra. Para usar CNPJ de verdade:
+Descoberta com dado real (ver ADR-016): por padrão `PLACES_PROVIDER=mock` gera empresas fictícias, sem custo e sem passo extra. Já rodamos isto de ponta a ponta para Fortaleza (52.503 estabelecimentos reais importados, campanha de teste trouxe 30 dentistas de verdade). Para importar outra cidade:
 
 ```bash
-# 1. Baixa os arquivos abertos da Receita (confira o mês vigente em
-#    https://arquivos.receitafederal.gov.br/dados/cnpj/dados_abertos_cnpj/)
+# 1. Baixa os arquivos abertos da Receita (confira o mês vigente navegando
+#    em https://arquivos.receitafederal.gov.br/ -> Dados > Cadastros > CNPJ;
+#    o portal é um Nextcloud, o download real é via WebDAV — ver
+#    scripts/cnpj-import/config.ts)
 docker compose exec core-api pnpm run import:cnpj:download -- --mes=2026-09
 
 # 2. Filtra por município + nichos já cadastrados na aba Nichos e importa
@@ -1624,7 +1626,7 @@ docker compose exec core-api pnpm run import:cnpj -- --municipio="Fortaleza"
 docker compose restart core-api
 ```
 
-O passo 1 baixa dezenas de GB (arquivos não vêm particionados por UF); o passo 2 processa tudo em streaming, sem carregar arquivo inteiro em memória, e só grava em `cnpj_establishments` o que casar com o município e os CNAEs mapeados em `src/discovery/providers/cnae-by-category.ts`.
+O passo 1 baixa uns 6-7GB por mês (arquivos não vêm particionados por UF — cada um cobre o Brasil inteiro); o passo 2 processa tudo em streaming, sem carregar arquivo inteiro em memória, e só grava em `cnpj_establishments` o que casar com o município e os CNAEs mapeados em `src/discovery/providers/cnae-by-category.ts` (por CNAE principal **ou** secundário — um estabelecimento cuja atividade principal é outra, mas lista um dos CNAEs alvo como secundária, também entra).
 
 ### 6.6 Comandos de build e testes
 

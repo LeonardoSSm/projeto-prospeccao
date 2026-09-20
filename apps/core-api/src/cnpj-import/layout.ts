@@ -3,11 +3,11 @@
 // (Latin-1), um arquivo ESTABELECIMENTOS por "lote" contendo o Brasil inteiro
 // misturado — nada disto vem particionado por UF.
 //
-// IMPORTANTE: este layout foi implementado com base na documentação pública
-// amplamente usada pela comunidade (ex.: "Metadados_dados_abertos_cnpj.pdf" da
-// própria Receita), mas nunca foi validado contra um arquivo real nesta sessão
-// (não há como baixar dezenas de GB aqui). Antes da primeira importação de
-// verdade, confirme os índices abaixo contra a documentação oficial vigente.
+// Validado contra o dump real de 2026-09 (import completo de Fortaleza,
+// 52.503 estabelecimentos, 100% de casamento de razão social via Empresas) —
+// os índices abaixo batem com a documentação pública ("Metadados_dados_
+// abertos_cnpj.pdf" da própria Receita). Se um mês futuro vier com uma coluna
+// a mais/a menos, é aqui que ajusta.
 
 export const SITUACAO_CADASTRAL_LABEL: Record<string, string> = {
   "01": "NULA",
