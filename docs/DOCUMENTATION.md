@@ -1609,24 +1609,28 @@ Seeds são determinísticos, idempotentes e nunca executados no perfil de produ�
 
 Login local: o realm `prospector` (`deploy/keycloak/prospector-realm.json`, importado automaticamente pelo Keycloak) já contém um usuário por papel, com e-mail igual ao semeado por `prisma/seed.ts` (ex.: `dev-admin@prospector.dev`) e senha `devpassword123` para todos. No primeiro login de cada um, a API casa o usuário pelo e-mail e grava o `sub` real do Keycloak — depois disso a busca já é direta.
 
-Descoberta com dado real (ver ADR-016): por padrão `PLACES_PROVIDER=mock` gera empresas fictícias, sem custo e sem passo extra. Já rodamos isto de ponta a ponta para Fortaleza (52.503 estabelecimentos reais importados, campanha de teste trouxe 30 dentistas de verdade). Para importar outra cidade:
+Descoberta com dado real (ver ADR-016): por padrão `PLACES_PROVIDER=mock` gera empresas fictícias, sem custo e sem passo extra. Já rodamos isto de ponta a ponta para Fortaleza (52.503 estabelecimentos reais importados, campanha de teste trouxe 30 dentistas de verdade) e depois expandimos para as principais cidades do Ceará. Para importar (mais) cidades:
 
 ```bash
 # 1. Baixa os arquivos abertos da Receita (confira o mês vigente navegando
 #    em https://arquivos.receitafederal.gov.br/ -> Dados > Cadastros > CNPJ;
 #    o portal é um Nextcloud, o download real é via WebDAV — ver
-#    scripts/cnpj-import/config.ts)
+#    scripts/cnpj-import/config.ts). Só precisa rodar de novo se o mês mudar —
+#    os arquivos já baixados cobrem o Brasil inteiro, não só uma cidade.
 docker compose exec core-api pnpm run import:cnpj:download -- --mes=2026-09
 
-# 2. Filtra por município + nichos já cadastrados na aba Nichos e importa
-docker compose exec core-api pnpm run import:cnpj -- --municipio="Fortaleza"
+# 2. Filtra por município(s) + nichos já cadastrados na aba Nichos e importa.
+#    --municipio aceita uma lista separada por vírgula — uma única varredura
+#    dos ~73M linhas cobre todas as cidades pedidas, em vez de reler tudo por
+#    cidade.
+docker compose exec core-api pnpm run import:cnpj -- --municipio="Caucaia,Juazeiro Do Norte,Maracanau,Sobral,Crato,Itapipoca,Maranguape,Iguatu,Quixada,Caninde"
 
-# 3. Troca o provider e reinicia
+# 3. Troca o provider (se ainda não estiver) e reinicia
 #    PLACES_PROVIDER=receita_federal no .env.local, depois:
 docker compose restart core-api
 ```
 
-O passo 1 baixa uns 6-7GB por mês (arquivos não vêm particionados por UF — cada um cobre o Brasil inteiro); o passo 2 processa tudo em streaming, sem carregar arquivo inteiro em memória, e só grava em `cnpj_establishments` o que casar com o município e os CNAEs mapeados em `src/discovery/providers/cnae-by-category.ts` (por CNAE principal **ou** secundário — um estabelecimento cuja atividade principal é outra, mas lista um dos CNAEs alvo como secundária, também entra).
+O passo 1 baixa uns 6-7GB por mês (arquivos não vêm particionados por UF — cada um cobre o Brasil inteiro); o passo 2 processa tudo em streaming, sem carregar arquivo inteiro em memória, e só grava em `cnpj_establishments` o que casar com algum dos municípios pedidos e os CNAEs mapeados em `src/discovery/providers/cnae-by-category.ts` (por CNAE principal **ou** secundário — um estabelecimento cuja atividade principal é outra, mas lista um dos CNAEs alvo como secundária, também entra).
 
 ### 6.6 Comandos de build e testes
 

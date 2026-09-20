@@ -6,7 +6,7 @@ import { openSingleEntryStream } from "./zip-stream";
 
 // Municipios.zip é pequeno (~5.500 linhas) — dá pra carregar por inteiro em
 // memória, ao contrário de Estabelecimentos/Empresas.
-async function loadMunicipios(): Promise<Map<string, string>> {
+async function loadMunicipios(): Promise<Map<string, string[]>> {
   const stream = await openSingleEntryStream(path.join(DATA_DIR, "Municipios.zip"));
   const chunks: Buffer[] = [];
   for await (const chunk of stream) {
@@ -15,12 +15,16 @@ async function loadMunicipios(): Promise<Map<string, string>> {
   const content = Buffer.concat(chunks).toString("latin1");
 
   const rows: string[][] = parse(content, { delimiter: ";", relax_quotes: true });
-  const byNameUf = new Map<string, string>();
+  const byName = new Map<string, string[]>();
   for (const row of rows) {
     const parsed = parseMunicipioRow(row);
-    if (parsed) byNameUf.set(normalizeKey(parsed.nome), parsed.codigo);
+    if (!parsed) continue;
+    const key = normalizeKey(parsed.nome);
+    const codigos = byName.get(key) ?? [];
+    codigos.push(parsed.codigo);
+    byName.set(key, codigos);
   }
-  return byNameUf;
+  return byName;
 }
 
 function normalizeKey(nome: string): string {
@@ -31,17 +35,31 @@ function normalizeKey(nome: string): string {
     .trim();
 }
 
-// A tabela da Receita não separa por UF explicitamente no nome — municípios
-// homônimos de UFs diferentes existem, mas são raros para os nichos deste
-// piloto; se aparecer ambiguidade real, resolver manualmente é preferível a
-// adivinhar.
-export async function resolveMunicipioCodigo(nomeMunicipio: string): Promise<string> {
+// A tabela da Receita não separa por UF (só CODIGO;NOME) — municípios
+// homônimos de UFs diferentes existem de verdade (ex.: "IGUATU" aparece duas
+// vezes, uma delas no Ceará). Por isso devolvemos TODOS os códigos candidatos
+// por nome em vez de escolher um; quem chama filtra pelos que realmente têm
+// estabelecimentos com a UF certa (campo presente em cada linha de
+// Estabelecimentos, ao contrário de Municipios.zip) — ver
+// `import-estabelecimentos.ts`.
+//
+// Carrega Municipios.zip uma única vez e resolve várias cidades de uma vez,
+// pra permitir uma única varredura de Estabelecimentos cobrindo N municípios
+// em vez de N varreduras (cada Estabelecimentos*.zip tem dezenas de milhões
+// de linhas; reler tudo por cidade seria N vezes mais lento à toa).
+export async function resolveMunicipioCodigos(
+  nomes: string[],
+): Promise<Array<{ nome: string; codigos: string[] }>> {
   const municipios = await loadMunicipios();
-  const codigo = municipios.get(normalizeKey(nomeMunicipio));
-  if (!codigo) {
-    throw new Error(
-      `Município "${nomeMunicipio}" não encontrado em Municipios.zip. Confira a grafia oficial usada pela Receita.`,
-    );
-  }
-  return codigo;
+  return nomes.map((nome) => {
+    const codigos = municipios.get(normalizeKey(nome));
+    if (!codigos || codigos.length === 0) notFound(nome);
+    return { nome, codigos: codigos! };
+  });
+}
+
+function notFound(nomeMunicipio: string): never {
+  throw new Error(
+    `Município "${nomeMunicipio}" não encontrado em Municipios.zip. Confira a grafia oficial usada pela Receita.`,
+  );
 }
