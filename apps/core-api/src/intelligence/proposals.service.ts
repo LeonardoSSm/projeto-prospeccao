@@ -53,6 +53,13 @@ export class ProposalsService {
     });
   }
 
+  async findByLead(organizationId: string, leadId: string): Promise<Proposal[]> {
+    return this.prisma.proposal.findMany({
+      where: { leadId, lead: { organizationId } },
+      orderBy: { revision: "desc" },
+    });
+  }
+
   async findOne(organizationId: string, proposalId: string): Promise<Proposal> {
     const proposal = await this.prisma.proposal.findFirst({
       where: { id: proposalId, lead: { organizationId } },

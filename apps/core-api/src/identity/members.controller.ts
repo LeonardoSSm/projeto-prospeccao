@@ -1,0 +1,31 @@
+import { Controller, Get } from "@nestjs/common";
+import { ApiTags } from "@nestjs/swagger";
+import { CurrentOrganizationId } from "../common/decorators/current-organization.decorator";
+import { PrismaService } from "../prisma/prisma.service";
+
+// Endpoint mínimo para a interface web listar quem pode ser responsável por um
+// lead (PATCH /leads/{id}/crm) — não existe uma Fase "Identity" própria no
+// roadmap (0-6), então isso fica junto do necessário mínimo até um módulo de
+// Identity & Access de verdade (com OIDC real, seção 5.2) existir.
+@ApiTags("identity")
+@Controller("members")
+export class MembersController {
+  constructor(private readonly prisma: PrismaService) {}
+
+  @Get()
+  async findMany(@CurrentOrganizationId() organizationId: string) {
+    const memberships = await this.prisma.membership.findMany({
+      where: { organizationId, status: "ACTIVE" },
+      include: { user: true },
+      orderBy: { role: "asc" },
+    });
+    return {
+      items: memberships.map((m) => ({
+        userId: m.userId,
+        displayName: m.user.displayName,
+        email: m.user.email,
+        role: m.role,
+      })),
+    };
+  }
+}

@@ -15,6 +15,11 @@ export class ProposalsController {
     return this.proposalsService.generateDraft(organizationId, leadId);
   }
 
+  @Get("leads/:leadId/proposals")
+  findByLead(@CurrentOrganizationId() organizationId: string, @Param("leadId") leadId: string) {
+    return this.proposalsService.findByLead(organizationId, leadId);
+  }
+
   @Get("proposals/:id")
   findOne(@CurrentOrganizationId() organizationId: string, @Param("id") id: string) {
     return this.proposalsService.findOne(organizationId, id);

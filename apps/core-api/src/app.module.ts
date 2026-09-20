@@ -8,6 +8,7 @@ import { CommonModule } from "./common/common.module";
 import { CrmModule } from "./crm/crm.module";
 import { DiscoveryModule } from "./discovery/discovery.module";
 import { HealthModule } from "./health/health.module";
+import { IdentityModule } from "./identity/identity.module";
 import { ImportsModule } from "./imports/imports.module";
 import { IntelligenceModule } from "./intelligence/intelligence.module";
 import { JobsModule } from "./jobs/jobs.module";
@@ -34,6 +35,7 @@ import { ScoringModule } from "./scoring/scoring.module";
     IntelligenceModule,
     CrmModule,
     OutreachModule,
+    IdentityModule,
   ],
 })
 export class AppModule implements NestModule {
