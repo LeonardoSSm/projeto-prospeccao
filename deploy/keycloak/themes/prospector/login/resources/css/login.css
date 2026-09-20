@@ -1,0 +1,120 @@
+/* Tema "prospector": mesma identidade visual do dashboard (fundo escuro com
+ * grid/glow, Space Grotesk + Inter + JetBrains Mono, acentos cyan->violeta)
+ * aplicada por cima do tema keycloak.v2 (PatternFly 5) — ver theme.properties.
+ * Só CSS: nenhum template.ftl foi copiado/alterado.
+ */
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap");
+
+html.login-pf,
+body#keycloak-bg {
+  background-color: #05070d !important;
+  background-image:
+    radial-gradient(ellipse 900px 600px at 10% -10%, rgba(34, 211, 238, 0.18), transparent 60%),
+    radial-gradient(ellipse 800px 700px at 100% 0%, rgba(167, 139, 250, 0.16), transparent 60%),
+    radial-gradient(ellipse 1000px 800px at 50% 110%, rgba(52, 211, 153, 0.08), transparent 60%),
+    linear-gradient(rgba(148, 163, 184, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.06) 1px, transparent 1px);
+  background-size:
+    100% 100%,
+    100% 100%,
+    100% 100%,
+    44px 44px,
+    44px 44px;
+}
+
+body {
+  font-family: "Inter", ui-sans-serif, sans-serif;
+}
+
+/* Wordmark no topo do card ("prospector" vira "PROSPECTOR." em gradiente) */
+#kc-header-wrapper.pf-v5-c-brand {
+  font-family: "Space Grotesk", ui-sans-serif, sans-serif;
+  font-weight: 700;
+  font-size: 1.35rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background-image: linear-gradient(90deg, #22d3ee, #a78bfa);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+#kc-header-wrapper.pf-v5-c-brand::after {
+  content: ".";
+  -webkit-text-fill-color: #22d3ee;
+  color: #22d3ee;
+}
+
+.pf-v5-c-login__main {
+  background: linear-gradient(180deg, rgba(17, 25, 45, 0.94), rgba(9, 13, 24, 0.9)) !important;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 1rem !important;
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.04),
+    0 20px 40px -24px rgba(0, 0, 0, 0.7);
+}
+
+#kc-page-title,
+.pf-v5-c-title {
+  font-family: "Space Grotesk", ui-sans-serif, sans-serif;
+  color: #e7ecf5 !important;
+}
+
+.pf-v5-c-form__label-text {
+  color: #8592ab !important;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  font-weight: 500;
+}
+
+.pf-v5-c-form-control {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 0.5rem !important;
+  box-shadow: none !important;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.pf-v5-c-form-control:focus-within {
+  border-color: rgba(34, 211, 238, 0.5) !important;
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.15) !important;
+}
+.pf-v5-c-form-control input {
+  color: #e7ecf5 !important;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+}
+
+.pf-v5-c-input-group {
+  background: transparent !important;
+}
+.pf-v5-c-button.pf-m-control {
+  background: transparent !important;
+  color: #8592ab !important;
+  border: none !important;
+}
+
+#kc-login,
+.pf-v5-c-button.pf-m-primary {
+  background: linear-gradient(90deg, #22d3ee, #a78bfa) !important;
+  border: none !important;
+  color: #05070d !important;
+  font-weight: 600 !important;
+  box-shadow: 0 0 20px rgba(34, 211, 238, 0.3);
+  transition: transform 0.15s ease;
+}
+#kc-login:hover,
+.pf-v5-c-button.pf-m-primary:hover {
+  transform: scale(1.01);
+}
+
+a,
+#kc-registration a,
+#kc-info-wrapper a {
+  color: #22d3ee !important;
+}
+
+.pf-v5-c-alert.pf-m-danger,
+.pf-v5-c-alert.pf-m-warning {
+  background: rgba(251, 113, 133, 0.1) !important;
+  border-color: rgba(251, 113, 133, 0.3) !important;
+  color: #fda4af !important;
+}

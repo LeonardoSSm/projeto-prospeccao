@@ -87,6 +87,7 @@ services:
       - "8081:8080"
     volumes:
       - ./deploy/keycloak/prospector-realm.json:/opt/keycloak/data/import/prospector-realm.json:ro
+      - ./deploy/keycloak/themes/prospector:/opt/keycloak/themes/prospector:ro
 
   n8n:
     image: n8nio/n8n:latest

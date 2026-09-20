@@ -1327,6 +1327,7 @@ Ameaças prioritárias: acesso cruzado entre organizações, SSRF, execução ma
 - `OIDC_ISSUER_URI` (o que o navegador vê e que aparece em `iss`) e `OIDC_JWKS_URI` (endpoint que a própria API usa para buscar as chaves de assinatura) são configurados separadamente porque, em Docker, o navegador e a API alcançam o IdP por hostnames diferentes (host publicado vs. rede interna do compose) — ver `.env.example`.
 - `organizationId` nunca vem do cliente: o guard resolve o usuário pelo `sub` do token (com fallback por e-mail no primeiro login, cobrindo os usuários semeados por `prisma/seed.ts`) e deriva a organização da `Membership` ativa correspondente.
 - Ambiente local usa Keycloak em Docker (`deploy/keycloak/prospector-realm.json`) com os seis usuários de desenvolvimento já provisionados; produção aponta as mesmas variáveis para qualquer IdP OIDC padrão (Auth0, Okta, Azure AD etc.).
+- A tela de login usa um tema Keycloak próprio (`deploy/keycloak/themes/prospector/`) que estende `keycloak.v2` só por CSS — mesma identidade visual do dashboard (fundo com grid/glow, gradiente cyan→violeta, tipografia Space Grotesk/Inter/JetBrains Mono), sem tocar nos templates/fluxos de autenticação do Keycloak.
 - Contas de serviço usam Client Credentials com escopos mínimos ou identidade de workload em nuvem.
 - Webhooks usam assinatura HMAC, timestamp e proteção contra replay.
 - MFA é delegado ao provedor de identidade e obrigatório para papéis administrativos em produção.
