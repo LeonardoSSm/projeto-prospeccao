@@ -1,8 +1,9 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "react-oidc-context";
-import { Layers, LogOut, Radar, Rocket, Users2 } from "lucide-react";
+import { Database, Layers, LogOut, Radar, Rocket, Users2 } from "lucide-react";
 import { fetchApiHealth } from "../api/client";
+import { getMe } from "../api/identity";
 
 const NAV_ITEMS = [
   { to: "/campaigns", label: "Campanhas", icon: Rocket },
@@ -12,10 +13,12 @@ const NAV_ITEMS = [
 
 export function Layout() {
   const health = useQuery({ queryKey: ["api-health"], queryFn: fetchApiHealth, retry: false });
+  const me = useQuery({ queryKey: ["me"], queryFn: getMe, retry: false });
   const auth = useAuth();
   const online = health.data?.status === "ok";
   const email = auth.user?.profile.email ?? "";
   const initials = email.slice(0, 2).toUpperCase() || "?";
+  const navItems = me.data?.role === "ADMIN" ? [...NAV_ITEMS, { to: "/central", label: "Central", icon: Database }] : NAV_ITEMS;
 
   return (
     <div className="relative min-h-screen">
@@ -32,7 +35,7 @@ export function Layout() {
               </span>
             </div>
             <nav className="flex items-center gap-1">
-              {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
+              {navItems.map(({ to, label, icon: Icon }) => (
                 <NavLink
                   key={to}
                   to={to}

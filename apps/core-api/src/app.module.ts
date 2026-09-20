@@ -1,5 +1,6 @@
 import { MiddlewareConsumer, Module, type NestModule } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
+import { AdminModule } from "./admin/admin.module";
 import { AuditingModule } from "./auditing/auditing.module";
 import { AuthModule } from "./auth/auth.module";
 import { CampaignsModule } from "./campaigns/campaigns.module";
@@ -39,6 +40,7 @@ import { ScoringModule } from "./scoring/scoring.module";
     OutreachModule,
     IdentityModule,
     NichesModule,
+    AdminModule,
   ],
 })
 export class AppModule implements NestModule {
