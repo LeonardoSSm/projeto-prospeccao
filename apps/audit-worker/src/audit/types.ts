@@ -15,6 +15,18 @@ export interface AuditFindingPayload {
   evidence: Record<string, unknown>;
 }
 
+// whatsappNumber/instagramHandle vêm de contact-extraction.ts — o valor real
+// extraído do href, não só a detecção booleana de presença (hasWhatsAppCta).
+export interface AuditFeaturesPayload {
+  mobileFriendly: boolean;
+  hasWhatsAppCta: boolean;
+  hasContactForm: boolean;
+  hasTitle: boolean;
+  hasMetaDescription: boolean;
+  whatsappNumber: string | null;
+  instagramHandle: string | null;
+}
+
 export interface AuditCompletedPayload {
   auditRequestId: string;
   leadId: string;
@@ -33,7 +45,7 @@ export interface AuditCompletedPayload {
     bestPractices: number | null;
     metrics: Record<string, unknown>;
   };
-  features: Record<string, unknown>;
+  features: AuditFeaturesPayload;
   findings: AuditFindingPayload[];
   reportObjectKey: string;
   screenshotObjectKey: string;

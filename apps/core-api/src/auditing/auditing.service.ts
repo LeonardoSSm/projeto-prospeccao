@@ -3,6 +3,7 @@ import type { Prisma, WebsiteAudit } from "@prisma/client";
 import { AppException } from "../common/exceptions/app.exception";
 import { IdService } from "../common/id.service";
 import { JobsService } from "../jobs/jobs.service";
+import { LeadsService } from "../leads/leads.service";
 import { OutboxService } from "../outbox/outbox.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { ScoringService } from "../scoring/scoring.service";
@@ -22,6 +23,7 @@ export class AuditingService {
     private readonly outbox: OutboxService,
     private readonly jobsService: JobsService,
     private readonly scoringService: ScoringService,
+    private readonly leadsService: LeadsService,
   ) {}
 
   private async requireLead(organizationId: string, leadId: string) {
@@ -125,7 +127,7 @@ export class AuditingService {
             https: payload.http.https,
             redirectCount: payload.http.redirectCount,
           } as Prisma.InputJsonValue,
-          featuresDetected: payload.features as Prisma.InputJsonValue,
+          featuresDetected: payload.features as unknown as Prisma.InputJsonValue,
           reportObjectKey: payload.reportObjectKey,
           screenshotObjectKey: payload.screenshotObjectKey,
         },
@@ -145,7 +147,25 @@ export class AuditingService {
     });
 
     await this.completeRelatedJob(payload.auditRequestId);
+    await this.attachDiscoveredContacts(payload);
     await this.triggerScoring(payload.leadId, correlationId);
+  }
+
+  // Best-effort: um contato a mais não deve derrubar a aplicação do resultado
+  // de auditoria nem o disparo do score. Roda fora da transação principal —
+  // ver nota em LeadsService.attachDiscoveredContact.
+  private async attachDiscoveredContacts(payload: AuditCompletedPayload): Promise<void> {
+    const { whatsappNumber, instagramHandle } = payload.features;
+    if (whatsappNumber) {
+      await this.leadsService
+        .attachDiscoveredContact(payload.leadId, "WHATSAPP", whatsappNumber)
+        .catch((error) => this.logger.error(`Falha ao anexar WhatsApp descoberto ao lead ${payload.leadId}`, error));
+    }
+    if (instagramHandle) {
+      await this.leadsService
+        .attachDiscoveredContact(payload.leadId, "INSTAGRAM", instagramHandle)
+        .catch((error) => this.logger.error(`Falha ao anexar Instagram descoberto ao lead ${payload.leadId}`, error));
+    }
   }
 
   async applyFailed(payload: AuditFailedPayload, correlationId: string): Promise<void> {

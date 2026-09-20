@@ -4,6 +4,7 @@ import { AuditLogService } from "../common/audit-log.service";
 import { IdService } from "../common/id.service";
 import { NormalizationService } from "../common/normalization.service";
 import { AppException } from "../common/exceptions/app.exception";
+import { NominatimGeocodingService } from "../discovery/geocoding/nominatim-geocoding.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { ScoringService } from "../scoring/scoring.service";
 import { DedupeService, type MatchKind } from "./dedupe.service";
@@ -111,6 +112,7 @@ export class LeadsService {
     private readonly dedupe: DedupeService,
     private readonly scoringService: ScoringService,
     private readonly auditLog: AuditLogService,
+    private readonly geocoding: NominatimGeocodingService,
   ) {}
 
   // Ponto único de entrada de dados externos (conector de descoberta ou CSV): normaliza,
@@ -211,7 +213,31 @@ export class LeadsService {
       }
     }
 
+    // Fase 2: fontes como a Receita Federal trazem endereço mas nunca
+    // coordenada — geocodifica de forma assíncrona (não bloqueia o upsert).
+    // O mock já preenche latitude/longitude, então isso só dispara pra quem
+    // realmente precisa.
+    if (result.matchKind === "NEW" && input.latitude == null && input.longitude == null && input.addressLine) {
+      this.geocoding.enqueue(result.leadId, {
+        addressLine: input.addressLine,
+        city: input.city,
+        state: input.state,
+        country: input.country,
+      });
+    }
+
     return result;
+  }
+
+  // Chamado pelo AuditingService quando o audit-worker extrai um contato real
+  // (WhatsApp/Instagram) do próprio site do lead (Fase 3 — ver
+  // docs/ANALISE_FONTES_DADOS_PROSPECCAO_LOCAL.md). Roda fora da transação de
+  // aplicação do resultado de auditoria: é um enriquecimento best-effort, não
+  // precisa ser atômico com o registro da auditoria em si.
+  async attachDiscoveredContact(leadId: string, type: "WHATSAPP" | "INSTAGRAM", rawValue: string): Promise<void> {
+    const normalizedValue = type === "WHATSAPP" ? this.normalization.phone(rawValue) : rawValue.toLowerCase();
+    if (!normalizedValue) return;
+    await this.prisma.$transaction((tx) => this.upsertContact(tx, leadId, type, rawValue, normalizedValue));
   }
 
   private async upsertContact(

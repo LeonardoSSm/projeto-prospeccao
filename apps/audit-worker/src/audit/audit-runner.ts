@@ -4,6 +4,7 @@ import { config } from "../config";
 import { safeFetch } from "../ssrf/safe-fetch";
 import { createSsrfRouteGuard } from "../ssrf/request-guard";
 import { uploadArtifact } from "../storage/s3-client";
+import { extractInstagramHandle, extractWhatsAppNumber } from "./contact-extraction";
 import { buildFindings } from "./findings";
 import type { AuditCompletedPayload, AuditRequestedPayload } from "./types";
 
@@ -104,9 +105,12 @@ export async function runAudit(request: AuditRequestedPayload): Promise<AuditCom
     });
 
     const domFeatures = await page.evaluate(() => {
-      const hasWhatsAppCta = Boolean(
-        document.querySelector('a[href*="wa.me"], a[href*="api.whatsapp.com"]'),
-      );
+      // page.evaluate() só devolve dados serializáveis — o parsing do valor real
+      // (número/handle) do href acontece fora do navegador, em contact-extraction.ts.
+      const whatsAppHref = document
+        .querySelector('a[href*="wa.me"], a[href*="api.whatsapp.com"]')
+        ?.getAttribute("href") ?? null;
+      const instagramHref = document.querySelector('a[href*="instagram.com/"]')?.getAttribute("href") ?? null;
       const hasContactForm = Boolean(document.querySelector("form"));
       const hasTitle = document.title.trim().length > 0;
       const metaDescription = document
@@ -114,7 +118,8 @@ export async function runAudit(request: AuditRequestedPayload): Promise<AuditCom
         ?.getAttribute("content")
         ?.trim();
       return {
-        hasWhatsAppCta,
+        whatsAppHref,
+        instagramHref,
         hasContactForm,
         hasTitle,
         hasMetaDescription: Boolean(metaDescription),
@@ -143,7 +148,17 @@ export async function runAudit(request: AuditRequestedPayload): Promise<AuditCom
       requestCount: lhr.audits["network-requests"]?.details?.items?.length ?? null,
     };
     const mobileFriendly = (lhr.audits["viewport"]?.score ?? 0) === 1;
-    const features = { ...domFeatures, mobileFriendly };
+    const whatsappNumber = extractWhatsAppNumber(domFeatures.whatsAppHref);
+    const instagramHandle = extractInstagramHandle(domFeatures.instagramHref);
+    const features = {
+      mobileFriendly,
+      hasWhatsAppCta: Boolean(domFeatures.whatsAppHref),
+      hasContactForm: domFeatures.hasContactForm,
+      hasTitle: domFeatures.hasTitle,
+      hasMetaDescription: domFeatures.hasMetaDescription,
+      whatsappNumber,
+      instagramHandle,
+    };
 
     const reportKey = `audits/${request.auditRequestId}/lighthouse.json`;
     const screenshotKey = `audits/${request.auditRequestId}/screenshot.png`;
