@@ -9,6 +9,7 @@ import {
   type CreateCampaignInput,
 } from "../api/campaigns";
 import { ApiError } from "../api/client";
+import { listNiches } from "../api/niches";
 import { Badge } from "../components/Badge";
 import { Panel } from "../components/Panel";
 import { StatCard } from "../components/StatCard";
@@ -32,6 +33,7 @@ export function CampaignsPage() {
   const [runningId, setRunningId] = useState<string | null>(null);
 
   const campaigns = useQuery({ queryKey: ["campaigns"], queryFn: listCampaigns });
+  const niches = useQuery({ queryKey: ["niches", "active"], queryFn: () => listNiches(true) });
   const items = campaigns.data?.items ?? [];
   const cities = new Set(items.map((c) => c.geography.city)).size;
   const categories = new Set(items.map((c) => c.category)).size;
@@ -138,14 +140,32 @@ export function CampaignsPage() {
               />
             </div>
             <div>
-              <label className={labelClass}>Categoria</label>
-              <input
-                required
-                placeholder="DENTIST"
-                className={`${inputClass} font-mono`}
-                value={form.category}
-                onChange={(e) => setForm({ ...form, category: e.target.value })}
-              />
+              <label className={labelClass}>Nicho</label>
+              {niches.data && niches.data.length > 0 ? (
+                <select
+                  required
+                  className={`${inputClass} font-mono`}
+                  value={form.category}
+                  onChange={(e) => setForm({ ...form, category: e.target.value })}
+                >
+                  <option value="" disabled className="bg-slate-900">
+                    Selecione um nicho...
+                  </option>
+                  {niches.data.map((niche) => (
+                    <option key={niche.id} value={niche.category} className="bg-slate-900">
+                      {niche.name} ({niche.category})
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <p className="mt-1 text-xs text-slate-500">
+                  Nenhum nicho ativo ainda.{" "}
+                  <Link to="/niches" className="text-cyan-400 underline-offset-2 hover:underline">
+                    Cadastre um nicho
+                  </Link>{" "}
+                  para escolher a categoria de busca.
+                </p>
+              )}
             </div>
             <div>
               <label className={labelClass}>Cidade</label>

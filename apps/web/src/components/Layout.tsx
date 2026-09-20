@@ -1,12 +1,13 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "react-oidc-context";
-import { LogOut, Radar, Rocket, Users2 } from "lucide-react";
+import { Layers, LogOut, Radar, Rocket, Users2 } from "lucide-react";
 import { fetchApiHealth } from "../api/client";
 
 const NAV_ITEMS = [
   { to: "/campaigns", label: "Campanhas", icon: Rocket },
   { to: "/leads", label: "Leads", icon: Users2 },
+  { to: "/niches", label: "Nichos", icon: Layers },
 ];
 
 export function Layout() {

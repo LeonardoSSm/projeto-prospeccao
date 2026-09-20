@@ -20,8 +20,29 @@ model Organization {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   memberships Membership[]
+  niches      Niche[]
 
   @@map("organizations")
+}
+
+// Catálogo de nichos que a organização prospecta (ex.: "Dentistas" ->
+// categoria de busca "DENTIST") — usado como lista de escolha na criação de
+// campanhas, em vez de digitar a categoria livremente a cada vez.
+model Niche {
+  id             String   @id @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  name           String
+  category       String
+  description    String?
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, category])
+  @@index([organizationId, active])
+  @@map("niches")
 }
 
 model User {

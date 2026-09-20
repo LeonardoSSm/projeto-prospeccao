@@ -92,6 +92,30 @@ async function main(): Promise<void> {
     });
   }
   console.log(`Usuários de desenvolvimento prontos: ${roles.map((r) => r.role).join(", ")}`);
+
+  // Ponto de partida para a aba de nichos — a organização edita/adiciona à
+  // vontade depois; isto só evita a lista nascer vazia.
+  const niches: Array<{ name: string; category: string; description: string }> = [
+    { name: "Dentistas", category: "DENTIST", description: "Clínicas e consultórios odontológicos" },
+    { name: "Advogados", category: "LAWYER", description: "Escritórios e profissionais de advocacia" },
+    { name: "Restaurantes", category: "RESTAURANT", description: "Restaurantes e casas de comida" },
+    { name: "Academias", category: "GYM", description: "Academias e estúdios de treino" },
+    { name: "Salões de Beleza", category: "BEAUTY_SALON", description: "Salões de beleza e barbearias" },
+    { name: "Clínicas de Estética", category: "AESTHETIC_CLINIC", description: "Estética facial e corporal" },
+    { name: "Pet Shops", category: "PET_SHOP", description: "Pet shops e clínicas veterinárias" },
+    { name: "Contadores", category: "ACCOUNTING", description: "Escritórios de contabilidade" },
+    { name: "Imobiliárias", category: "REAL_ESTATE", description: "Imobiliárias e corretores" },
+    { name: "Oficinas Mecânicas", category: "AUTO_REPAIR", description: "Oficinas e serviços automotivos" },
+  ];
+
+  for (const niche of niches) {
+    await prisma.niche.upsert({
+      where: { organizationId_category: { organizationId: DEV_ORGANIZATION_ID, category: niche.category } },
+      update: {},
+      create: { id: uuidv7(), organizationId: DEV_ORGANIZATION_ID, ...niche },
+    });
+  }
+  console.log(`Nichos prontos: ${niches.map((n) => n.category).join(", ")}`);
 }
 
 main()
