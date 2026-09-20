@@ -60,6 +60,37 @@ async function main(): Promise<void> {
     },
   });
   console.log(`Template de prompt pronto: ${prompt.version}`);
+
+  // "usuários para cada papel" (seção 6.5) — oidc_subject fixo e legível porque
+  // ainda não existe OIDC de verdade (seção 5.2); troca sozinho quando existir,
+  // sem precisar mudar nada além de como o subject chega.
+  const roles: Array<{ role: string; subject: string; name: string }> = [
+    { role: "ADMIN", subject: "dev-admin", name: "Admin Dev" },
+    { role: "ANALYST", subject: "dev-analyst", name: "Analista Dev" },
+    { role: "SALES", subject: "dev-sales", name: "Vendedor Dev" },
+    { role: "MANAGER", subject: "dev-manager", name: "Gestor Dev" },
+    { role: "OPERATOR", subject: "dev-operator", name: "Operador Dev" },
+    { role: "VIEWER", subject: "dev-viewer", name: "Auditor Dev" },
+  ];
+
+  for (const { role, subject, name } of roles) {
+    const user = await prisma.user.upsert({
+      where: { oidcSubject: subject },
+      update: {},
+      create: {
+        id: uuidv7(),
+        oidcSubject: subject,
+        email: `${subject}@prospector.dev`,
+        displayName: name,
+      },
+    });
+    await prisma.membership.upsert({
+      where: { organizationId_userId: { organizationId: DEV_ORGANIZATION_ID, userId: user.id } },
+      update: { role },
+      create: { id: uuidv7(), organizationId: DEV_ORGANIZATION_ID, userId: user.id, role },
+    });
+  }
+  console.log(`Usuários de desenvolvimento prontos: ${roles.map((r) => r.role).join(", ")}`);
 }
 
 main()

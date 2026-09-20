@@ -1,5 +1,6 @@
 import { HttpStatus, Injectable, Logger } from "@nestjs/common";
 import type { Lead, Prisma } from "@prisma/client";
+import { AuditLogService } from "../common/audit-log.service";
 import { IdService } from "../common/id.service";
 import { NormalizationService } from "../common/normalization.service";
 import { AppException } from "../common/exceptions/app.exception";
@@ -108,6 +109,7 @@ export class LeadsService {
     private readonly normalization: NormalizationService,
     private readonly dedupe: DedupeService,
     private readonly scoringService: ScoringService,
+    private readonly auditLog: AuditLogService,
   ) {}
 
   // Ponto único de entrada de dados externos (conector de descoberta ou CSV): normaliza,
@@ -324,6 +326,18 @@ export class LeadsService {
       }
     } else {
       await this.prisma.lead.update({ where: { id }, data });
+    }
+
+    if (dto.dataQualityStatus !== undefined) {
+      // "mudança manual de score/status" é evento obrigatório de auditoria de
+      // segurança (docs/DOCUMENTATION.md seção 5.9).
+      await this.auditLog.record({
+        organizationId,
+        action: "LEAD_DATA_QUALITY_STATUS_CHANGED",
+        resourceType: "LEAD",
+        resourceId: id,
+        changes: { from: current.dataQualityStatus, to: dto.dataQualityStatus },
+      });
     }
 
     return this.findOne(organizationId, id);

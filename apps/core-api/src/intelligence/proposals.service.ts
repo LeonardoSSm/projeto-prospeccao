@@ -1,5 +1,6 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
 import type { Proposal } from "@prisma/client";
+import { AuditLogService } from "../common/audit-log.service";
 import { AppException } from "../common/exceptions/app.exception";
 import { IdService } from "../common/id.service";
 import { PrismaService } from "../prisma/prisma.service";
@@ -12,6 +13,7 @@ export class ProposalsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly idService: IdService,
+    private readonly auditLog: AuditLogService,
   ) {}
 
   async generateDraft(organizationId: string, leadId: string): Promise<Proposal> {
@@ -74,12 +76,24 @@ export class ProposalsService {
       });
     }
 
-    return this.prisma.proposal.update({
+    const updated = await this.prisma.proposal.update({
       where: { id: proposalId },
       data: {
         status: dto.decision,
         approvedAt: dto.decision === "APPROVED" ? new Date() : null,
       },
     });
+
+    // "aprovação/rejeição de proposta e mensagem" é evento obrigatório de
+    // auditoria de segurança (docs/DOCUMENTATION.md seção 5.9).
+    await this.auditLog.record({
+      organizationId,
+      action: dto.decision === "APPROVED" ? "PROPOSAL_APPROVED" : "PROPOSAL_REJECTED",
+      resourceType: "PROPOSAL",
+      resourceId: proposalId,
+      changes: { leadId: proposal.leadId, revision: proposal.revision, comment: dto.comment },
+    });
+
+    return updated;
   }
 }

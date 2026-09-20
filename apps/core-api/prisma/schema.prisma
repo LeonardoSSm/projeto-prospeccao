@@ -157,6 +157,7 @@ model Lead {
   scores       LeadScore[]
   aiAnalyses   AiAnalysis[]
   proposals    Proposal[]
+  activities   CrmActivity[]
 
   @@index([organizationId, crmStage, currentScore(sort: Desc), updatedAt(sort: Desc)])
   @@index([organizationId, cityNormalized, category])
@@ -338,7 +339,38 @@ model Proposal {
   @@map("proposals")
 }
 
-// --- Operations (Job/Outbox) ----------------------------------------------
+// --- CRM (Fase 5) --------------------------------------------------------
+
+model CrmActivity {
+  id           String    @id @db.Uuid
+  leadId       String    @map("lead_id") @db.Uuid
+  activityType String    @map("activity_type")
+  summary      String
+  occurredAt   DateTime  @default(now()) @map("occurred_at") @db.Timestamptz
+  nextActionAt DateTime? @map("next_action_at") @db.Timestamptz
+
+  lead Lead @relation(fields: [leadId], references: [id])
+
+  @@index([leadId, occurredAt(sort: Desc)])
+  @@map("crm_activities")
+}
+
+// --- Operations (Job/Outbox/Audit) ----------------------------------------
+
+model AuditLog {
+  id             String   @id @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  actorUserId    String?  @map("actor_user_id") @db.Uuid
+  action         String
+  resourceType   String   @map("resource_type")
+  resourceId     String   @map("resource_id") @db.Uuid
+  changes        Json
+  occurredAt     DateTime @default(now()) @map("occurred_at") @db.Timestamptz
+
+  @@index([organizationId, resourceType, resourceId])
+  @@index([organizationId, occurredAt(sort: Desc)])
+  @@map("audit_logs")
+}
 
 model Job {
   id             String   @id @db.Uuid

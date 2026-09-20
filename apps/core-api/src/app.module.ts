@@ -5,6 +5,7 @@ import { CampaignsModule } from "./campaigns/campaigns.module";
 import { CorrelationIdMiddleware } from "./common/middleware/correlation-id.middleware";
 import { OrgContextMiddleware } from "./common/middleware/org-context.middleware";
 import { CommonModule } from "./common/common.module";
+import { CrmModule } from "./crm/crm.module";
 import { DiscoveryModule } from "./discovery/discovery.module";
 import { HealthModule } from "./health/health.module";
 import { ImportsModule } from "./imports/imports.module";
@@ -30,6 +31,7 @@ import { ScoringModule } from "./scoring/scoring.module";
     ImportsModule,
     AuditingModule,
     IntelligenceModule,
+    CrmModule,
   ],
 })
 export class AppModule implements NestModule {
