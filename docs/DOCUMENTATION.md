@@ -1549,6 +1549,14 @@ docker compose --env-file .env.local watch
 
 Só é necessário instalar Node.js/pnpm localmente para quem quer rodar lint/typecheck/testes diretamente na IDE fora do container — nunca para operar o produto.
 
+Depois da stack subir pela primeira vez, rode o seed (idempotente, seção 6.5) — sem isso não existe organização de desenvolvimento e toda escrita falha por violação de FK:
+
+```bash
+docker compose exec core-api sh -c "cd apps/core-api && corepack pnpm run prisma:seed"
+```
+
+Ou, se tiver `make` instalado (opcional, seção 6.1): `make seed`.
+
 Endpoints locais esperados:
 
 | Serviço | URL |

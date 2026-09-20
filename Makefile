@@ -1,4 +1,4 @@
-.PHONY: up down logs ps migrate verify contract-test compose-test
+.PHONY: up down logs ps migrate seed verify contract-test compose-test
 
 up:
 	# -V renova volumes anônimos (node_modules dos serviços em modo dev) — sem isso,
@@ -17,6 +17,11 @@ ps:
 
 migrate:
 	docker compose run --rm core-api-migrate
+
+# Idempotente (docs/DOCUMENTATION.md seção 6.5) — sem isto, não existe organização
+# de desenvolvimento e toda escrita falha por violação de FK (organization_id).
+seed:
+	docker compose exec core-api sh -c "cd apps/core-api && corepack pnpm run prisma:seed"
 
 verify:
 	docker compose exec core-api pnpm lint

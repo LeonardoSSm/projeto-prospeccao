@@ -54,6 +54,11 @@ export interface ListLeadsQuery {
 }
 
 const SORTABLE_FIELDS = new Set(["currentScore", "updatedAt", "tradeName", "rating", "reviewCount"]);
+// Campos onde NULL significa "ainda não calculado/coletado", não "menor valor
+// possível" — sem isto, leads sem score ainda apareceriam no topo de um
+// `sort=-currentScore` (Postgres trata NULL como maior que qualquer número em
+// ORDER BY DESC por padrão), quebrando o próprio propósito do Top 10.
+const NULLABLE_SORT_FIELDS = new Set(["currentScore", "rating", "reviewCount"]);
 
 // Faixas espelhando bandFor() em scoring/policies/policy-2026-09-v1.ts. Duplicado
 // aqui como range numérico (em vez de importar bandFor) porque o filtro precisa
@@ -65,7 +70,7 @@ const BAND_RANGES: Record<string, { gte: number; lte: number }> = {
   PRIORITY: { gte: 71, lte: 100 },
 };
 
-function parseSort(sort: string | undefined): Prisma.LeadOrderByWithRelationInput[] {
+export function parseSort(sort: string | undefined): Prisma.LeadOrderByWithRelationInput[] {
   if (!sort) return [{ updatedAt: "desc" }, { id: "desc" }];
 
   const orderBy = sort
@@ -76,7 +81,11 @@ function parseSort(sort: string | undefined): Prisma.LeadOrderByWithRelationInpu
       const desc = raw.startsWith("-");
       const field = desc ? raw.slice(1) : raw;
       if (!SORTABLE_FIELDS.has(field)) return null;
-      return { [field]: desc ? "desc" : "asc" };
+      const direction = desc ? "desc" : "asc";
+      if (NULLABLE_SORT_FIELDS.has(field)) {
+        return { [field]: { sort: direction, nulls: "last" } };
+      }
+      return { [field]: direction };
     })
     .filter((entry): entry is Prisma.LeadOrderByWithRelationInput => entry !== null);
 

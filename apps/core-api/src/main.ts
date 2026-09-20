@@ -42,7 +42,11 @@ function toValidationException(errors: ValidationError[]): AppException {
 }
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // bodyParser: false porque vamos registrar o parser JSON nós mesmos logo
+  // abaixo — com o parser automático do Nest ligado, os dois parsers de JSON
+  // disputavam o mesmo stream de request e corrompiam caracteres multi-byte
+  // (um em-dash virava U+FFFD mesmo com o corpo chegando como UTF-8 correto).
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });
 
   const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS ?? "http://localhost:3000")
     .split(",")
@@ -53,6 +57,7 @@ async function bootstrap(): Promise<void> {
   // parser padrão do Express só entende Content-Type: application/json e
   // descartaria o corpo de um PATCH enviado com o content-type correto.
   app.useBodyParser("json", { type: ["application/json", "application/merge-patch+json"] });
+  app.useBodyParser("urlencoded", { extended: true });
 
   app.setGlobalPrefix("api/v1", { exclude: ["health"] });
   app.useGlobalFilters(new ProblemDetailsFilter());
