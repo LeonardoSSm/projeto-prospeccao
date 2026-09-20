@@ -19,6 +19,7 @@ export interface UpsertLeadInput {
   provider: string;
   externalId: string;
   campaignRunId?: string;
+  cnpj?: string;
   legalName: string;
   tradeName?: string;
   category: string;
@@ -125,6 +126,7 @@ export class LeadsService {
         organizationId: input.organizationId,
         provider: input.provider,
         externalId: input.externalId,
+        cnpj: input.cnpj ?? null,
         normalizedDomain,
         normalizedPhone,
       });
@@ -137,6 +139,7 @@ export class LeadsService {
                 data: {
                   id: this.idService.generate(),
                   organizationId: input.organizationId,
+                  cnpj: input.cnpj,
                   legalName: input.legalName,
                   tradeName: input.tradeName,
                   category: input.category,

@@ -313,6 +313,7 @@ As versões abaixo são baselines do projeto, não uma obrigação de atualizaç
 | ADR-013 | Prisma como ORM e ferramenta de migração | Aceita | Cliente tipado e migrações versionadas coerentes com um stack 100% TypeScript |
 | ADR-014 | Ambiente de desenvolvimento inteiramente em containers | Aceita | `docker compose up` sobe api, worker, web e infraestrutura juntos; onboarding não depende de toolchain local |
 | ADR-015 | OIDC via SPA (Authorization Code + PKCE) com Bearer JWT direto na API, sem BFF | Aceita | Elimina o `X-Organization-Id` temporário; API stateless valida o token via JWKS e deriva `organizationId` da Membership do usuário. Troca a mitigação extra de um BFF por simplicidade — aceitável para o MVP, revisitável se a superfície de XSS do dashboard crescer. Keycloak roda em Docker só para desenvolvimento local; produção aponta as mesmas variáveis para qualquer IdP OIDC |
+| ADR-016 | Receita Federal (CNPJ) como fonte primária de descoberta, antes de Google Places | Aceita | Dado aberto e gratuito, sem chave de API nem cobrança por evento (`docs/ANALISE_FONTES_DADOS_PROSPECCAO_LOCAL.md`). Implementado como mais um `PlacesProvider` (`ReceitaFederalPlacesProvider`) atrás da mesma interface do mock — Campaigns/Discovery/Leads não sabem a diferença. Importação é um script offline (`apps/core-api/scripts/cnpj-import/`), nunca uma chamada ao vivo: os arquivos da Receita são dumps de dezenas de GB, não uma API de busca |
 
 Novos ADRs devem usar `docs/adr/NNNN-titulo.md`, contendo contexto, decisão, alternativas, consequências e status.
 
@@ -1536,8 +1537,8 @@ O `.env.example` documenta nomes, nunca segredos reais.
 | `S3_SECRET_KEY` | API/worker | Sim | valor local |
 | `LLM_PROVIDER` | API | Não | `mock` |
 | `LLM_API_KEY` | API | Quando provedor real | segredo |
-| `PLACES_PROVIDER` | API/n8n | Não | `mock` |
-| `PLACES_API_KEY` | API/n8n | Quando provedor real | segredo |
+| `PLACES_PROVIDER` | API/n8n | Não | `mock`, ou `receita_federal` (dado real, sem custo — seção 1.10) |
+| `PLACES_API_KEY` | API/n8n | Quando provedor real | segredo (não usado por `receita_federal`) |
 | `AUDIT_MAX_CONCURRENCY` | worker | Sim | `2` |
 | `AUDIT_TIMEOUT_MS` | worker | Sim | `90000` |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | todos | Não | `http://otel-collector:4318` |
@@ -1607,6 +1608,23 @@ O projeto deve fornecer:
 Seeds são determinísticos, idempotentes e nunca executados no perfil de produção.
 
 Login local: o realm `prospector` (`deploy/keycloak/prospector-realm.json`, importado automaticamente pelo Keycloak) já contém um usuário por papel, com e-mail igual ao semeado por `prisma/seed.ts` (ex.: `dev-admin@prospector.dev`) e senha `devpassword123` para todos. No primeiro login de cada um, a API casa o usuário pelo e-mail e grava o `sub` real do Keycloak — depois disso a busca já é direta.
+
+Descoberta com dado real (opcional, ver ADR-016): por padrão `PLACES_PROVIDER=mock` gera empresas fictícias, sem custo e sem passo extra. Para usar CNPJ de verdade:
+
+```bash
+# 1. Baixa os arquivos abertos da Receita (confira o mês vigente em
+#    https://arquivos.receitafederal.gov.br/dados/cnpj/dados_abertos_cnpj/)
+docker compose exec core-api pnpm run import:cnpj:download -- --mes=2026-09
+
+# 2. Filtra por município + nichos já cadastrados na aba Nichos e importa
+docker compose exec core-api pnpm run import:cnpj -- --municipio="Fortaleza"
+
+# 3. Troca o provider e reinicia
+#    PLACES_PROVIDER=receita_federal no .env.local, depois:
+docker compose restart core-api
+```
+
+O passo 1 baixa dezenas de GB (arquivos não vêm particionados por UF); o passo 2 processa tudo em streaming, sem carregar arquivo inteiro em memória, e só grava em `cnpj_establishments` o que casar com o município e os CNAEs mapeados em `src/discovery/providers/cnae-by-category.ts`.
 
 ### 6.6 Comandos de build e testes
 

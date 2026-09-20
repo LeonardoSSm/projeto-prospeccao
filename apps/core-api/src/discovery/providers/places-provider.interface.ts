@@ -1,5 +1,8 @@
 export interface DiscoveredPlace {
   externalId: string;
+  // Preenchido só por fontes que identificam CNPJ (ex.: Receita Federal) —
+  // o mock e um eventual Google Places não têm esse dado.
+  cnpj?: string;
   legalName: string;
   tradeName?: string;
   category: string;

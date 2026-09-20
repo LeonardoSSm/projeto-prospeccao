@@ -12,6 +12,7 @@ interface MatchInput {
   organizationId: string;
   provider: string;
   externalId: string;
+  cnpj: string | null;
   normalizedDomain: string | null;
   normalizedPhone: string | null;
 }
@@ -34,6 +35,17 @@ export class DedupeService {
     });
     if (bySource) {
       return { kind: "MATCH", leadId: bySource.leadId };
+    }
+
+    // CNPJ é o sinal mais forte que existe — mais confiável até que domínio ou
+    // telefone, que podem ser compartilhados entre filiais ou trocados.
+    if (input.cnpj) {
+      const byCnpj = await tx.lead.findFirst({
+        where: { organizationId: input.organizationId, cnpj: input.cnpj, mergedIntoId: null },
+      });
+      if (byCnpj) {
+        return { kind: "MATCH", leadId: byCnpj.id };
+      }
     }
 
     if (input.normalizedDomain) {

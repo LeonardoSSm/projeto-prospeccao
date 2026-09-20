@@ -14,7 +14,9 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
-    "prisma:seed": "prisma db seed"
+    "prisma:seed": "prisma db seed",
+    "import:cnpj:download": "ts-node scripts/cnpj-import/download.ts",
+    "import:cnpj": "ts-node scripts/cnpj-import/run.ts"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
@@ -36,6 +38,7 @@
     "jwks-rsa": "^3.1.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
+    "unzipper": "^0.12.3",
     "uuidv7": "^1.0.2"
   },
   "devDependencies": {
@@ -48,6 +51,7 @@
     "@types/jsonwebtoken": "^9.0.7",
     "@types/multer": "^1.4.12",
     "@types/node": "^22.10.2",
+    "@types/unzipper": "^0.10.10",
     "@typescript-eslint/eslint-plugin": "^8.18.1",
     "@typescript-eslint/parser": "^8.18.1",
     "eslint": "^8.57.1",

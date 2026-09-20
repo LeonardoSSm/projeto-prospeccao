@@ -159,6 +159,11 @@ model Lead {
   websiteStatus      String    @default("UNKNOWN") @map("website_status")
   rating             Float?
   reviewCount        Int?      @map("review_count")
+  // Sinal de dedup mais forte que existe quando o lead vem de uma fonte que
+  // identifica CNPJ (ex.: Receita Federal) — ver DedupeService.findMatch.
+  // Único por organização, não globalmente: duas organizações (tenants)
+  // diferentes podem descobrir a mesma empresa real de forma independente.
+  cnpj               String?
   crmStage           String    @default("NEW") @map("crm_stage")
   currentScore       Int?      @map("current_score")
   assignedUserId     String?   @map("assigned_user_id") @db.Uuid
@@ -182,6 +187,7 @@ model Lead {
   activities   CrmActivity[]
   outreachMessages OutreachMessage[]
 
+  @@unique([organizationId, cnpj])
   @@index([organizationId, crmStage, currentScore(sort: Desc), updatedAt(sort: Desc)])
   @@index([organizationId, cityNormalized, category])
   @@map("leads")
@@ -469,4 +475,42 @@ model OutboxEvent {
 
   @@index([status, availableAt])
   @@map("outbox_events")
+}
+
+// --- Discovery real (CNPJ / Receita Federal) --------------------------------
+
+// Staging local dos dados abertos de CNPJ (docs/ANALISE_FONTES_DADOS_PROSPECCAO_LOCAL.md
+// seção 7) — populado por scripts/cnpj-import (fora do processo da API, nunca
+// via HTTP) e consultado ao vivo por ReceitaFederalPlacesProvider. Não tem
+// organizationId: é um catálogo público compartilhado, não dado de tenant.
+model CnpjEstablishment {
+  id                  String    @id @db.Uuid
+  cnpj                String    @unique
+  matrizFilial        String    @map("matriz_filial")
+  razaoSocial         String    @map("razao_social")
+  nomeFantasia        String?   @map("nome_fantasia")
+  situacaoCadastral   String    @map("situacao_cadastral")
+  dataSituacao        DateTime? @map("data_situacao") @db.Date
+  cnaeFiscalPrincipal String    @map("cnae_fiscal_principal")
+  cnaesSecundarios    String[]  @map("cnaes_secundarios")
+  logradouro          String?
+  numero              String?
+  complemento         String?
+  bairro              String?
+  cep                 String?
+  municipioCodigo     String    @map("municipio_codigo")
+  municipioNome       String    @map("municipio_nome")
+  uf                  String
+  ddd1                String?
+  telefone1           String?
+  ddd2                String?
+  telefone2           String?
+  email               String?
+  dataInicioAtividade DateTime? @map("data_inicio_atividade") @db.Date
+  porte               String?
+  capitalSocial       Decimal?  @map("capital_social") @db.Decimal(18, 2)
+  importedAt          DateTime  @default(now()) @map("imported_at") @db.Timestamptz
+
+  @@index([municipioCodigo, cnaeFiscalPrincipal])
+  @@map("cnpj_establishments")
 }

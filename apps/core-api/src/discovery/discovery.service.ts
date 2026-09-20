@@ -54,6 +54,7 @@ export class DiscoveryService {
             provider: this.provider.name,
             externalId: place.externalId,
             campaignRunId: params.campaignRunId,
+            cnpj: place.cnpj,
             legalName: place.legalName,
             tradeName: place.tradeName,
             category: place.category,

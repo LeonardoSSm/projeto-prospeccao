@@ -19,6 +19,7 @@ const baseInput = {
   organizationId: "org-1",
   provider: "MOCK",
   externalId: "ext-1",
+  cnpj: null as string | null,
   normalizedDomain: null as string | null,
   normalizedPhone: null as string | null,
 };
@@ -36,7 +37,24 @@ describe("DedupeService", () => {
     expect(tx.lead.findFirst).not.toHaveBeenCalled();
   });
 
-  it("falls back to a domain match when there is no source match", async () => {
+  it("falls back to a CNPJ match when there is no source match", async () => {
+    const tx = createMockTx();
+    tx.lead.findFirst.mockResolvedValue({ id: "lead-cnpj" });
+
+    const result = await dedupe.findMatch(tx as unknown as Prisma.TransactionClient, {
+      ...baseInput,
+      cnpj: "00000000000100",
+    });
+
+    expect(result).toEqual({ kind: "MATCH", leadId: "lead-cnpj" });
+    expect(tx.lead.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ cnpj: "00000000000100", mergedIntoId: null }),
+      }),
+    );
+  });
+
+  it("falls back to a domain match when there is no source or CNPJ match", async () => {
     const tx = createMockTx();
     tx.lead.findFirst.mockResolvedValue({ id: "lead-2" });
 
