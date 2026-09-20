@@ -68,6 +68,11 @@ export function AdminCentralPage() {
     navigate(`/central/${key}`);
   }
 
+  function selectGroup(group: string) {
+    const firstInGroup = grouped.find(([g]) => g === group)?.[1][0];
+    if (firstInGroup) selectModel(firstInGroup.key);
+  }
+
   function toggleSort(field: AdminFieldMeta) {
     if (field.kind !== "scalar") return;
     setPage(1);
@@ -92,6 +97,7 @@ export function AdminCentralPage() {
   }
 
   const totalPages = records.data ? Math.max(1, Math.ceil(records.data.total / PAGE_SIZE)) : 1;
+  const activeGroupModels = grouped.find(([g]) => g === activeModel?.group)?.[1] ?? [];
 
   return (
     <div>
@@ -102,31 +108,43 @@ export function AdminCentralPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[220px_1fr]">
+      {/* Nível 1: categorias (Identidade, Descoberta, Leads...) — uma faixa horizontal
+          que quebra linha sozinha em telas estreitas, em vez de uma lista vertical só
+          com todas as 25 tabelas misturadas. */}
+      <div className="mb-5 flex flex-wrap gap-2">
+        {grouped.map(([group]) => (
+          <button
+            key={group}
+            onClick={() => selectGroup(group)}
+            className={`rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-wider ring-1 ring-inset transition-colors ${
+              activeModel?.group === group
+                ? "bg-cyan-400/10 text-cyan-300 ring-cyan-400/40 shadow-[0_0_12px_rgba(34,211,238,0.15)]"
+                : "text-slate-500 ring-white/10 hover:text-slate-300"
+            }`}
+          >
+            {GROUP_LABELS[group]}
+          </button>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[200px_1fr]">
+        {/* Nível 2: só as tabelas da categoria ativa — uma lista curta (2 a 5 itens),
+            não as 25 juntas. */}
         <Panel className="h-fit lg:sticky lg:top-24">
-          <nav className="space-y-4">
-            {grouped.map(([group, groupModelsList]) => (
-              <div key={group}>
-                <p className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-slate-600">
-                  {GROUP_LABELS[group]}
-                </p>
-                <div className="space-y-0.5">
-                  {groupModelsList.map((model) => (
-                    <button
-                      key={model.key}
-                      onClick={() => selectModel(model.key)}
-                      className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-sm transition-colors ${
-                        activeModel?.key === model.key
-                          ? "bg-cyan-400/10 text-cyan-300"
-                          : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
-                      }`}
-                    >
-                      <span className="truncate">{model.label}</span>
-                      {model.readOnly && <Lock className="h-3 w-3 shrink-0 text-slate-600" />}
-                    </button>
-                  ))}
-                </div>
-              </div>
+          <nav className="space-y-0.5">
+            {activeGroupModels.map((model) => (
+              <button
+                key={model.key}
+                onClick={() => selectModel(model.key)}
+                className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-sm transition-colors ${
+                  activeModel?.key === model.key
+                    ? "bg-cyan-400/10 text-cyan-300"
+                    : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+                }`}
+              >
+                <span className="truncate">{model.label}</span>
+                {model.readOnly && <Lock className="h-3 w-3 shrink-0 text-slate-600" />}
+              </button>
             ))}
           </nav>
         </Panel>
@@ -137,22 +155,22 @@ export function AdminCentralPage() {
               title={activeModel.label}
               icon={Database}
               action={
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   {activeModel.readOnly && (
-                    <span className="flex items-center gap-1 rounded-full bg-slate-400/10 px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider text-slate-400 ring-1 ring-inset ring-slate-400/25">
+                    <span className="flex items-center gap-1 whitespace-nowrap rounded-full bg-slate-400/10 px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider text-slate-400 ring-1 ring-inset ring-slate-400/25">
                       <Lock className="h-3 w-3" /> somente leitura
                     </span>
                   )}
                   {activeModel.global && (
-                    <span className="rounded-full bg-violet-400/10 px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider text-violet-300 ring-1 ring-inset ring-violet-400/30">
+                    <span className="whitespace-nowrap rounded-full bg-violet-400/10 px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider text-violet-300 ring-1 ring-inset ring-violet-400/30">
                       catálogo global
                     </span>
                   )}
                 </div>
               }
             >
-              <div className="mb-4 flex items-center gap-3">
-                <div className="relative flex-1">
+              <div className="mb-4 flex flex-wrap items-center gap-3">
+                <div className="relative min-w-[180px] flex-1">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-600" />
                   <input
                     value={search}

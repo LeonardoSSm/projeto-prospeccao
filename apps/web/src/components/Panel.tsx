@@ -17,7 +17,7 @@ export function Panel({
   return (
     <section className={`glass-panel p-5 ${className}`}>
       {(title || action) && (
-        <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           {title && (
             <h2 className="flex items-center gap-2 font-display text-xs font-semibold uppercase tracking-[0.15em] text-slate-400">
               {Icon && <Icon className="h-3.5 w-3.5 text-cyan-400" />}

@@ -24,8 +24,8 @@ export function Layout() {
     <div className="relative min-h-screen">
       <div className="app-backdrop" />
       <header className="sticky top-0 z-20 border-b border-white/5 bg-[#05070d]/95">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
-          <div className="flex items-center gap-3 sm:gap-8">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
+          <div className="flex items-center gap-3 sm:gap-5">
             <div className="flex items-center gap-2.5">
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-400 via-cyan-500 to-violet-600 shadow-[0_0_20px_rgba(34,211,238,0.35)]">
                 <Radar className="h-5 w-5 text-slate-950" strokeWidth={2.5} />
@@ -34,7 +34,7 @@ export function Layout() {
                 PROSPECTOR<span className="text-cyan-400">.</span>
               </span>
             </div>
-            <nav className="flex items-center gap-1">
+            <nav className="flex flex-wrap items-center gap-1">
               {navItems.map(({ to, label, icon: Icon }) => (
                 <NavLink
                   key={to}
@@ -55,7 +55,7 @@ export function Layout() {
           </div>
 
           <div className="flex items-center gap-3 sm:gap-4">
-            <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium sm:flex">
+            <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium lg:flex">
               <span
                 className={`status-dot h-1.5 w-1.5 rounded-full ${online ? "bg-emerald-400 text-emerald-400" : "bg-rose-400 text-rose-400"}`}
               />
@@ -68,7 +68,7 @@ export function Layout() {
                 <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-400 to-cyan-400 font-mono text-[10px] font-bold text-slate-950">
                   {initials}
                 </div>
-                <span className="hidden max-w-[160px] truncate text-xs text-slate-300 md:inline">{email}</span>
+                <span className="hidden max-w-[160px] truncate text-xs text-slate-300 lg:inline">{email}</span>
                 <button
                   onClick={() => void auth.signoutRedirect()}
                   title="Sair"
