@@ -290,6 +290,7 @@ export class LeadsService {
     id: string,
     dto: UpdateLeadDto,
     ifMatchVersion?: number,
+    actorUserId?: string,
   ): Promise<Lead> {
     const current = await this.prisma.lead.findFirst({ where: { id, organizationId } });
     if (!current) {
@@ -333,6 +334,7 @@ export class LeadsService {
       // segurança (docs/DOCUMENTATION.md seção 5.9).
       await this.auditLog.record({
         organizationId,
+        actorUserId,
         action: "LEAD_DATA_QUALITY_STATUS_CHANGED",
         resourceType: "LEAD",
         resourceId: id,

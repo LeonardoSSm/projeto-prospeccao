@@ -1,3 +1,5 @@
+import { userManager } from "../auth/oidcConfig";
+
 const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080/api/v1";
 
 export interface ProblemDetails {
@@ -32,10 +34,19 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
   // verbos usam JSON comum.
   const requestContentType = rest.method === "PATCH" ? "application/merge-patch+json" : "application/json";
 
+  // Sem sessão no servidor (docs/DOCUMENTATION.md seção 5.2): cada chamada
+  // busca o usuário atual no UserManager (sessionStorage) e anexa o próprio
+  // access_token — não há cookie nem estado de auth guardado aqui.
+  const user = await userManager.getUser();
+  const authHeader: Record<string, string> = user?.access_token
+    ? { Authorization: `Bearer ${user.access_token}` }
+    : {};
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...rest,
     headers: {
       "Content-Type": requestContentType,
+      ...authHeader,
       ...(ifMatch !== undefined ? { "If-Match": `"${ifMatch}"` } : {}),
       ...headers,
     },

@@ -61,9 +61,10 @@ async function main(): Promise<void> {
   });
   console.log(`Template de prompt pronto: ${prompt.version}`);
 
-  // "usuários para cada papel" (seção 6.5) — oidc_subject fixo e legível porque
-  // ainda não existe OIDC de verdade (seção 5.2); troca sozinho quando existir,
-  // sem precisar mudar nada além de como o subject chega.
+  // "usuários para cada papel" (seção 6.5) — oidc_subject nasce com um valor
+  // fixo e legível; no primeiro login real (JwtAuthGuard#resolveUser), a API
+  // casa esse usuário pelo e-mail e grava o `sub` de verdade emitido pelo
+  // Keycloak, sem precisar de nenhuma mudança aqui.
   const roles: Array<{ role: string; subject: string; name: string }> = [
     { role: "ADMIN", subject: "dev-admin", name: "Admin Dev" },
     { role: "ANALYST", subject: "dev-analyst", name: "Analista Dev" },

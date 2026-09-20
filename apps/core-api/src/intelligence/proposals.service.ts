@@ -73,7 +73,12 @@ export class ProposalsService {
     return proposal;
   }
 
-  async decide(organizationId: string, proposalId: string, dto: ApproveProposalDto): Promise<Proposal> {
+  async decide(
+    organizationId: string,
+    proposalId: string,
+    dto: ApproveProposalDto,
+    actorUserId: string,
+  ): Promise<Proposal> {
     const proposal = await this.findOne(organizationId, proposalId);
     if (proposal.status !== "PENDING_APPROVAL") {
       throw new AppException(HttpStatus.CONFLICT, {
@@ -87,6 +92,7 @@ export class ProposalsService {
       where: { id: proposalId },
       data: {
         status: dto.decision,
+        approvedBy: actorUserId,
         approvedAt: dto.decision === "APPROVED" ? new Date() : null,
       },
     });
@@ -95,6 +101,7 @@ export class ProposalsService {
     // auditoria de segurança (docs/DOCUMENTATION.md seção 5.9).
     await this.auditLog.record({
       organizationId,
+      actorUserId,
       action: dto.decision === "APPROVED" ? "PROPOSAL_APPROVED" : "PROPOSAL_REJECTED",
       resourceType: "PROPOSAL",
       resourceId: proposalId,

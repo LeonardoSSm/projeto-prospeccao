@@ -1,6 +1,7 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { CurrentOrganizationId } from "../common/decorators/current-organization.decorator";
+import { CurrentUserId } from "../common/decorators/current-user.decorator";
 import { ApproveProposalDto } from "./dto/approve-proposal.dto";
 import { ProposalsService } from "./proposals.service";
 
@@ -28,9 +29,10 @@ export class ProposalsController {
   @Post("proposals/:id/approval")
   decide(
     @CurrentOrganizationId() organizationId: string,
+    @CurrentUserId() actorUserId: string,
     @Param("id") id: string,
     @Body() dto: ApproveProposalDto,
   ) {
-    return this.proposalsService.decide(organizationId, id, dto);
+    return this.proposalsService.decide(organizationId, id, dto, actorUserId);
   }
 }

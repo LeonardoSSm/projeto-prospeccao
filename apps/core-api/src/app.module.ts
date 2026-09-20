@@ -1,9 +1,9 @@
 import { MiddlewareConsumer, Module, type NestModule } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { AuditingModule } from "./auditing/auditing.module";
+import { AuthModule } from "./auth/auth.module";
 import { CampaignsModule } from "./campaigns/campaigns.module";
 import { CorrelationIdMiddleware } from "./common/middleware/correlation-id.middleware";
-import { OrgContextMiddleware } from "./common/middleware/org-context.middleware";
 import { CommonModule } from "./common/common.module";
 import { CrmModule } from "./crm/crm.module";
 import { DiscoveryModule } from "./discovery/discovery.module";
@@ -23,6 +23,7 @@ import { ScoringModule } from "./scoring/scoring.module";
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
     CommonModule,
+    AuthModule,
     OutboxModule,
     HealthModule,
     JobsModule,
@@ -40,6 +41,6 @@ import { ScoringModule } from "./scoring/scoring.module";
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
-    consumer.apply(CorrelationIdMiddleware, OrgContextMiddleware).forRoutes("*");
+    consumer.apply(CorrelationIdMiddleware).forRoutes("*");
   }
 }

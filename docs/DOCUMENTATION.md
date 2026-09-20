@@ -1,9 +1,9 @@
 # PROSPECTOR — Blueprint Técnico do Sistema
 
 > **Status:** Proposta arquitetural para implementação  
-> **Versão do documento:** 2.0.0  
+> **Versão do documento:** 2.1.0  
 > **Sistema:** Plataforma de descoberta, análise e qualificação de empresas para venda de criação ou reestruturação de sites  
-> **Última atualização:** 2026-09-19 — stack de backend/frontend migrada para NestJS + React (ADR-011 a ADR-014); correções de consistência nos exemplos de API, ERD e eventos  
+> **Última atualização:** 2026-09-20 — autenticação OIDC real via Keycloak (ADR-015), substituindo o header `X-Organization-Id` temporário; stack de backend/frontend migrada para NestJS + React (ADR-011 a ADR-014)  
 > **Público-alvo:** Arquitetura, Backend, Frontend, Dados, DevOps, QA, Produto e Operação Comercial
 
 Este documento é a fonte técnica de referência do sistema. Decisões que contrariem este blueprint devem ser registradas por meio de ADR (*Architecture Decision Record*) e refletidas em uma nova versão deste arquivo.
@@ -312,6 +312,7 @@ As versões abaixo são baselines do projeto, não uma obrigação de atualizaç
 | ADR-012 | React (SPA via Vite) sem SSR no frontend | Aceita | Build e deploy mais simples; API já resolve dados server-side, dispensando SSR no MVP |
 | ADR-013 | Prisma como ORM e ferramenta de migração | Aceita | Cliente tipado e migrações versionadas coerentes com um stack 100% TypeScript |
 | ADR-014 | Ambiente de desenvolvimento inteiramente em containers | Aceita | `docker compose up` sobe api, worker, web e infraestrutura juntos; onboarding não depende de toolchain local |
+| ADR-015 | OIDC via SPA (Authorization Code + PKCE) com Bearer JWT direto na API, sem BFF | Aceita | Elimina o `X-Organization-Id` temporário; API stateless valida o token via JWKS e deriva `organizationId` da Membership do usuário. Troca a mitigação extra de um BFF por simplicidade — aceitável para o MVP, revisitável se a superfície de XSS do dashboard crescer. Keycloak roda em Docker só para desenvolvimento local; produção aponta as mesmas variáveis para qualquer IdP OIDC |
 
 Novos ADRs devem usar `docs/adr/NNNN-titulo.md`, contendo contexto, decisão, alternativas, consequências e status.
 
@@ -1320,11 +1321,12 @@ Ameaças prioritárias: acesso cruzado entre organizações, SSRF, execução ma
 
 ### 5.2 Autenticação
 
-- OpenID Connect sobre OAuth 2.0 Authorization Code + PKCE para usuários.
-- Tokens de acesso JWT de curta duração, assinados assimetricamente (`RS256` ou `ES256`).
-- Validação de `iss`, `aud`, `exp`, `nbf`, assinatura e, quando aplicável, `azp`.
-- Renovação controlada pelo provedor; tokens não ficam em `localStorage`. Como o dashboard é uma SPA React sem servidor próprio (sem SSR/BFF do Next.js), o papel de BFF é assumido pelo próprio NestJS: o fluxo Authorization Code + PKCE troca o código por token no backend, que devolve um cookie de sessão `httpOnly`/`Secure`/`SameSite=Strict` ao navegador em vez de expor o token de acesso ao JavaScript do cliente.
-- NestJS valida o token via Passport (`passport-jwt` ou estratégia OIDC com `openid-client`), reutilizando as mesmas regras de `iss`/`aud`/`exp`/assinatura acima em um `AuthGuard` global.
+- OpenID Connect sobre OAuth 2.0 Authorization Code + PKCE para usuários, conduzido pela própria SPA React (`oidc-client-ts`/`react-oidc-context`) — sem BFF: o dashboard troca o código por token diretamente com o IdP e guarda o resultado em `sessionStorage` (gerenciado pela biblioteca), anexando `Authorization: Bearer <access_token>` em toda chamada à API. Essa escolha troca a mitigação extra de um cookie `httpOnly` (que exigiria um BFF dedicado, hoje inexistente) por simplicidade operacional; o risco de exfiltração via XSS é aceito nesta fase e mitigado pela CSP e sanitização de saída do frontend.
+- Tokens de acesso JWT de curta duração, assinados assimetricamente (`RS256`).
+- NestJS valida `iss`, `aud`, `exp` e a assinatura via JWKS num `JwtAuthGuard` global (`src/auth/`), sem sessão no servidor — cada requisição é validada de forma independente (`jsonwebtoken` + `jwks-rsa`, cache de chaves).
+- `OIDC_ISSUER_URI` (o que o navegador vê e que aparece em `iss`) e `OIDC_JWKS_URI` (endpoint que a própria API usa para buscar as chaves de assinatura) são configurados separadamente porque, em Docker, o navegador e a API alcançam o IdP por hostnames diferentes (host publicado vs. rede interna do compose) — ver `.env.example`.
+- `organizationId` nunca vem do cliente: o guard resolve o usuário pelo `sub` do token (com fallback por e-mail no primeiro login, cobrindo os usuários semeados por `prisma/seed.ts`) e deriva a organização da `Membership` ativa correspondente.
+- Ambiente local usa Keycloak em Docker (`deploy/keycloak/prospector-realm.json`) com os seis usuários de desenvolvimento já provisionados; produção aponta as mesmas variáveis para qualquer IdP OIDC padrão (Auth0, Okta, Azure AD etc.).
 - Contas de serviço usam Client Credentials com escopos mínimos ou identidade de workload em nuvem.
 - Webhooks usam assinatura HMAC, timestamp e proteção contra replay.
 - MFA é delegado ao provedor de identidade e obrigatório para papéis administrativos em produção.
@@ -1522,8 +1524,11 @@ O `.env.example` documenta nomes, nunca segredos reais.
 | `DATABASE_URL` | API | Sim | `postgresql://prospector:senha@postgres:5432/prospector` |
 | `REDIS_URL` | API | Sim | `redis://redis:6379` |
 | `RABBITMQ_URL` | API/worker | Sim | `amqp://prospector:...@rabbitmq:5672` |
-| `OIDC_ISSUER_URI` | API/web | Sim | issuer do IdP local |
+| `OIDC_ISSUER_URI` | API/web | Sim | issuer do IdP visto pelo navegador, ex.: `http://localhost:8081/realms/prospector` |
+| `OIDC_JWKS_URI` | API | Sim | endpoint de chaves que a API usa internamente, ex.: `http://keycloak:8080/realms/prospector/protocol/openid-connect/certs` |
 | `OIDC_AUDIENCE` | API | Sim | `prospector-api` |
+| `VITE_OIDC_AUTHORITY` | web | Sim | igual a `OIDC_ISSUER_URI` |
+| `VITE_OIDC_CLIENT_ID` | web | Sim | `prospector-web` |
 | `S3_ENDPOINT` | API/worker | Sim | `http://minio:9000` |
 | `S3_BUCKET` | API/worker | Sim | `prospector-artifacts` |
 | `S3_ACCESS_KEY` | API/worker | Sim | valor local |
@@ -1583,6 +1588,7 @@ Endpoints locais esperados:
 | MinIO Console | `http://localhost:9001` |
 | n8n | `http://localhost:5678` |
 | Grafana | `http://localhost:3001` |
+| Keycloak (IdP local) | `http://localhost:8081` |
 
 ### 6.5 Dados de desenvolvimento
 
@@ -1598,6 +1604,8 @@ O projeto deve fornecer:
 - buckets e filas provisionados automaticamente.
 
 Seeds são determinísticos, idempotentes e nunca executados no perfil de produção.
+
+Login local: o realm `prospector` (`deploy/keycloak/prospector-realm.json`, importado automaticamente pelo Keycloak) já contém um usuário por papel, com e-mail igual ao semeado por `prisma/seed.ts` (ex.: `dev-admin@prospector.dev`) e senha `devpassword123` para todos. No primeiro login de cada um, a API casa o usuário pelo e-mail e grava o `sub` real do Keycloak — depois disso a busca já é direta.
 
 ### 6.6 Comandos de build e testes
 
@@ -1666,7 +1674,8 @@ Critérios:
 | Worker não consome | RabbitMQ UI, fila e credenciais | Validar exchange, routing key e vhost |
 | Chromium falha | Dependências/imagem do worker | Recriar imagem oficial e reinstalar browser travado |
 | Screenshot ausente | Bucket, política e endpoint S3 | Reprovisionar bucket local e validar credenciais |
-| 401 no dashboard | issuer, audience e relógio | Conferir configuração OIDC e sincronização de hora |
+| 401 no dashboard | issuer, audience e relógio | Conferir `OIDC_ISSUER_URI`/`OIDC_JWKS_URI`/`OIDC_AUDIENCE`, sincronização de hora e se o Keycloak já terminou de subir (`docker compose logs keycloak`) |
+| 403 `AUTH_USER_NOT_PROVISIONED`/`AUTH_NO_ACTIVE_MEMBERSHIP` após login | E-mail do usuário no Keycloak não bate com nenhum `users.email` semeado | Usar um dos e-mails de `prisma/seed.ts` (seção 6.5) ou criar a Membership manualmente |
 | Auditoria presa | métricas de job, timeout e DLQ | Cancelar/reprocessar com nova tentativa idempotente |
 | Score inesperado | versão e fatores persistidos | Comparar evidências com a política daquela versão |
 | Hot-reload não funciona | `compose.override.yaml` aplicado e volumes montados | Rodar `docker compose watch` em vez de `up -d` |

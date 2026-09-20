@@ -36,7 +36,11 @@ export class OutreachService {
   // PENDING_APPROVAL, mesma simplificação de proposals.service.ts. Isso também
   // torna a transição DRAFT->SENT (proibida pela seção 3.3) inalcançável por
   // construção, não só "não permitida".
-  async createMessage(organizationId: string, dto: CreateOutreachMessageDto): Promise<OutreachMessage> {
+  async createMessage(
+    organizationId: string,
+    dto: CreateOutreachMessageDto,
+    actorUserId: string,
+  ): Promise<OutreachMessage> {
     const lead = await this.prisma.lead.findFirst({ where: { id: dto.leadId, organizationId } });
     if (!lead) {
       throw new AppException(HttpStatus.NOT_FOUND, { title: "Lead não encontrado", errorCode: "LEAD_NOT_FOUND" });
@@ -67,6 +71,7 @@ export class OutreachService {
 
     await this.auditLog.record({
       organizationId,
+      actorUserId,
       action: "OUTREACH_MESSAGE_CREATED",
       resourceType: "OUTREACH_MESSAGE",
       resourceId: message.id,
@@ -85,6 +90,7 @@ export class OutreachService {
     leadId: string,
     channel: string,
     reason: string,
+    actorUserId: string,
   ): Promise<void> {
     const lead = await this.prisma.lead.findFirst({ where: { id: leadId, organizationId } });
     if (!lead) {
@@ -105,6 +111,7 @@ export class OutreachService {
     await this.suppression.suppress(organizationId, channel, contact.normalizedValue, reason);
     await this.auditLog.record({
       organizationId,
+      actorUserId,
       action: "CONTACT_SUPPRESSED",
       resourceType: "LEAD",
       resourceId: leadId,
@@ -134,6 +141,7 @@ export class OutreachService {
     organizationId: string,
     messageId: string,
     dto: ApproveOutreachMessageDto,
+    actorUserId: string,
   ): Promise<OutreachMessage> {
     const message = await this.findOne(organizationId, messageId);
     if (message.status !== "PENDING_APPROVAL") {
@@ -148,12 +156,14 @@ export class OutreachService {
       where: { id: messageId },
       data: {
         status: dto.decision,
+        approvedBy: actorUserId,
         rejectedReason: dto.decision === "REJECTED" ? (dto.comment ?? "Rejeitada sem motivo informado") : null,
       },
     });
 
     await this.auditLog.record({
       organizationId,
+      actorUserId,
       action: dto.decision === "APPROVED" ? "OUTREACH_MESSAGE_APPROVED" : "OUTREACH_MESSAGE_REJECTED",
       resourceType: "OUTREACH_MESSAGE",
       resourceId: messageId,
@@ -172,6 +182,7 @@ export class OutreachService {
     organizationId: string,
     messageId: string,
     correlationId: string,
+    actorUserId: string,
   ): Promise<{ status: string; jobId: string | null }> {
     const message = await this.findOne(organizationId, messageId);
     if (message.status !== "APPROVED") {
@@ -190,6 +201,7 @@ export class OutreachService {
       });
       await this.auditLog.record({
         organizationId,
+        actorUserId,
         action: "OUTREACH_MESSAGE_BLOCKED_SUPPRESSED",
         resourceType: "OUTREACH_MESSAGE",
         resourceId: messageId,

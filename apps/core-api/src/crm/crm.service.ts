@@ -27,6 +27,7 @@ export class CrmService {
     dto: UpdateCrmDto,
     ifMatchVersion: number | undefined,
     correlationId: string,
+    actorUserId: string,
   ): Promise<Lead> {
     const current = await this.prisma.lead.findFirst({ where: { id: leadId, organizationId } });
     if (!current) {
@@ -83,6 +84,7 @@ export class CrmService {
       await this.auditLog.record(
         {
           organizationId,
+          actorUserId,
           action: "LEAD_CRM_UPDATED",
           resourceType: "LEAD",
           resourceId: leadId,

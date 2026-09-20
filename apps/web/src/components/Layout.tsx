@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "react-oidc-context";
 import { fetchApiHealth } from "../api/client";
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
@@ -9,6 +10,7 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
 
 export function Layout() {
   const health = useQuery({ queryKey: ["api-health"], queryFn: fetchApiHealth, retry: false });
+  const auth = useAuth();
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -25,18 +27,31 @@ export function Layout() {
               </NavLink>
             </nav>
           </div>
-          <span
-            className={`flex items-center gap-1.5 text-xs ${
-              health.data?.status === "ok" ? "text-emerald-600" : "text-red-500"
-            }`}
-          >
+          <div className="flex items-center gap-4">
             <span
-              className={`h-1.5 w-1.5 rounded-full ${
-                health.data?.status === "ok" ? "bg-emerald-500" : "bg-red-500"
+              className={`flex items-center gap-1.5 text-xs ${
+                health.data?.status === "ok" ? "text-emerald-600" : "text-red-500"
               }`}
-            />
-            API {health.isLoading ? "verificando..." : health.data?.status === "ok" ? "online" : "indisponível"}
-          </span>
+            >
+              <span
+                className={`h-1.5 w-1.5 rounded-full ${
+                  health.data?.status === "ok" ? "bg-emerald-500" : "bg-red-500"
+                }`}
+              />
+              API {health.isLoading ? "verificando..." : health.data?.status === "ok" ? "online" : "indisponível"}
+            </span>
+            {auth.isAuthenticated && (
+              <span className="flex items-center gap-2 text-sm text-slate-600">
+                {auth.user?.profile.email}
+                <button
+                  onClick={() => void auth.signoutRedirect()}
+                  className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50"
+                >
+                  Sair
+                </button>
+              </span>
+            )}
+          </div>
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-4 py-6">

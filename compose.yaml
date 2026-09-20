@@ -70,6 +70,24 @@ services:
       mc mb --ignore-existing local/${S3_BUCKET:-prospector-artifacts}
       "
 
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      # Fixa o issuer/endpoints em http://localhost:8081 independentemente de
+      # como o serviço é alcançado — o navegador fala com o Keycloak por esse
+      # host publicado, mas o core-api busca as chaves de assinatura pela rede
+      # interna do compose (OIDC_JWKS_URI aponta para http://keycloak:8080/...);
+      # sem isso o `iss` do token não bateria com o que a API espera validar.
+      KC_HOSTNAME: http://localhost:8081
+      KC_HTTP_ENABLED: "true"
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./deploy/keycloak/prospector-realm.json:/opt/keycloak/data/import/prospector-realm.json:ro
+
   n8n:
     image: n8nio/n8n:latest
     ports:
@@ -119,6 +137,8 @@ services:
         condition: service_healthy
       core-api-migrate:
         condition: service_completed_successfully
+      keycloak:
+        condition: service_started
 
   audit-worker:
     build:
@@ -136,6 +156,8 @@ services:
       dockerfile: apps/web/Dockerfile
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080/api/v1}
+        VITE_OIDC_AUTHORITY: ${VITE_OIDC_AUTHORITY:-http://localhost:8081/realms/prospector}
+        VITE_OIDC_CLIENT_ID: ${VITE_OIDC_CLIENT_ID:-prospector-web}
     ports:
       - "3000:3000"
     depends_on:

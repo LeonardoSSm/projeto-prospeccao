@@ -1,0 +1,94 @@
+{
+  "realm": "prospector",
+  "enabled": true,
+  "sslRequired": "none",
+  "accessTokenLifespan": 1800,
+  "clients": [
+    {
+      "clientId": "prospector-web",
+      "name": "Prospector Web (SPA)",
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "enabled": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": ["http://localhost:3000/*"],
+      "webOrigins": ["http://localhost:3000"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:3000/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "prospector-api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "prospector-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "dev-admin",
+      "email": "dev-admin@prospector.dev",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Admin",
+      "lastName": "Dev",
+      "credentials": [{ "type": "password", "value": "devpassword123", "temporary": false }]
+    },
+    {
+      "username": "dev-analyst",
+      "email": "dev-analyst@prospector.dev",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Analista",
+      "lastName": "Dev",
+      "credentials": [{ "type": "password", "value": "devpassword123", "temporary": false }]
+    },
+    {
+      "username": "dev-sales",
+      "email": "dev-sales@prospector.dev",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Vendedor",
+      "lastName": "Dev",
+      "credentials": [{ "type": "password", "value": "devpassword123", "temporary": false }]
+    },
+    {
+      "username": "dev-manager",
+      "email": "dev-manager@prospector.dev",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Gestor",
+      "lastName": "Dev",
+      "credentials": [{ "type": "password", "value": "devpassword123", "temporary": false }]
+    },
+    {
+      "username": "dev-operator",
+      "email": "dev-operator@prospector.dev",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Operador",
+      "lastName": "Dev",
+      "credentials": [{ "type": "password", "value": "devpassword123", "temporary": false }]
+    },
+    {
+      "username": "dev-viewer",
+      "email": "dev-viewer@prospector.dev",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Auditor",
+      "lastName": "Dev",
+      "credentials": [{ "type": "password", "value": "devpassword123", "temporary": false }]
+    }
+  ]
+}

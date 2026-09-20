@@ -2,6 +2,7 @@ import { Body, Controller, Get, Headers, Param, Patch, Query } from "@nestjs/com
 import { ApiTags } from "@nestjs/swagger";
 import type { Lead } from "@prisma/client";
 import { CurrentOrganizationId } from "../common/decorators/current-organization.decorator";
+import { CurrentUserId } from "../common/decorators/current-user.decorator";
 import { bandFor } from "../scoring/policies/policy-2026-09-v1";
 import { ListLeadsQueryDto } from "./dto/list-leads.query.dto";
 import { UpdateLeadDto } from "./dto/update-lead.dto";
@@ -61,10 +62,11 @@ export class LeadsController {
   @Patch(":id")
   update(
     @CurrentOrganizationId() organizationId: string,
+    @CurrentUserId() actorUserId: string,
     @Param("id") id: string,
     @Body() dto: UpdateLeadDto,
     @Headers("if-match") ifMatch?: string,
   ) {
-    return this.leadsService.update(organizationId, id, dto, parseIfMatch(ifMatch));
+    return this.leadsService.update(organizationId, id, dto, parseIfMatch(ifMatch), actorUserId);
   }
 }
