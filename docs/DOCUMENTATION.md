@@ -1638,6 +1638,7 @@ Critérios:
 | Auditoria presa | métricas de job, timeout e DLQ | Cancelar/reprocessar com nova tentativa idempotente |
 | Score inesperado | versão e fatores persistidos | Comparar evidências com a política daquela versão |
 | Hot-reload não funciona | `compose.override.yaml` aplicado e volumes montados | Rodar `docker compose watch` em vez de `up -d` |
+| Dependência nova (`pnpm add`) não aparece no container | Volume anônimo de `node_modules` reaproveitado entre recriações | `docker compose up -d --build -V` (renova volumes anônimos; `make up` já faz isso) |
 
 ## 7. Estratégia de Testes e Qualidade de Código
 

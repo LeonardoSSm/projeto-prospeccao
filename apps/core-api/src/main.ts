@@ -1,8 +1,44 @@
 import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
-import { ValidationPipe } from "@nestjs/common";
+import { HttpStatus, ValidationPipe, type ValidationError } from "@nestjs/common";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { AppModule } from "./app.module";
+import { AppException } from "./common/exceptions/app.exception";
+import { ProblemDetailsFilter } from "./common/filters/problem-details.filter";
+
+interface Violation {
+  field: string;
+  code: string;
+  message: string;
+}
+
+// class-validator aninha erros de DTOs internos (@ValidateNested) em `children`,
+// em vez de repetir tudo em `constraints` no nível raiz — é preciso descer
+// recursivamente para não perder violações de campos como `filters.minimumRating`.
+function flattenValidationErrors(errors: ValidationError[], parentPath = ""): Violation[] {
+  return errors.flatMap((error) => {
+    const path = parentPath ? `${parentPath}.${error.property}` : error.property;
+    const ownViolations = Object.entries(error.constraints ?? {}).map(([code, message]) => ({
+      field: path,
+      code: code.toUpperCase(),
+      message,
+    }));
+    const childViolations = error.children?.length
+      ? flattenValidationErrors(error.children, path)
+      : [];
+    return [...ownViolations, ...childViolations];
+  });
+}
+
+function toValidationException(errors: ValidationError[]): AppException {
+  const violations = flattenValidationErrors(errors);
+  return new AppException(HttpStatus.UNPROCESSABLE_ENTITY, {
+    title: "A requisição possui campos inválidos",
+    detail: "Corrija os campos indicados e tente novamente.",
+    errorCode: "VALIDATION_FAILED",
+    violations,
+  });
+}
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
@@ -13,11 +49,14 @@ async function bootstrap(): Promise<void> {
   app.enableCors({ origin: allowedOrigins, credentials: true });
 
   app.setGlobalPrefix("api/v1", { exclude: ["health"] });
+  app.useGlobalFilters(new ProblemDetailsFilter());
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
+      errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+      exceptionFactory: toValidationException,
     }),
   );
 

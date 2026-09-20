@@ -31,7 +31,8 @@ model User {
   displayName String   @map("display_name")
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  memberships Membership[]
+  memberships   Membership[]
+  assignedLeads Lead[]
 
   @@map("users")
 }
@@ -49,4 +50,164 @@ model Membership {
   @@unique([organizationId, userId])
   @@index([organizationId, role, status])
   @@map("memberships")
+}
+
+// --- Campaigns (Fase 1) --------------------------------------------------
+
+model Campaign {
+  id                String   @id @db.Uuid
+  organizationId    String   @map("organization_id") @db.Uuid
+  name              String
+  category          String
+  geographicFilter  Json     @map("geographic_filter")
+  discoveryFilters  Json     @map("discovery_filters")
+  providers         String[]
+  status            String   @default("DRAFT")
+  version           Int      @default(1)
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  runs CampaignRun[]
+
+  @@index([organizationId, status, updatedAt(sort: Desc)])
+  @@map("campaigns")
+}
+
+model CampaignRun {
+  id              String    @id @db.Uuid
+  campaignId      String    @map("campaign_id") @db.Uuid
+  status          String    @default("QUEUED")
+  filtersSnapshot Json      @map("filters_snapshot")
+  discoveredCount Int       @default(0) @map("discovered_count")
+  acceptedCount   Int       @default(0) @map("accepted_count")
+  duplicateCount  Int       @default(0) @map("duplicate_count")
+  failedCount     Int       @default(0) @map("failed_count")
+  requestedBy     String?   @map("requested_by") @db.Uuid
+  startedAt       DateTime? @map("started_at") @db.Timestamptz
+  finishedAt      DateTime? @map("finished_at") @db.Timestamptz
+  failureReason   String?   @map("failure_reason")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  campaign Campaign     @relation(fields: [campaignId], references: [id])
+  sources  LeadSource[]
+
+  @@index([campaignId, createdAt(sort: Desc)])
+  @@map("campaign_runs")
+}
+
+// --- Discovery & Leads (Fase 1) -------------------------------------------
+
+model LeadSource {
+  id             String   @id @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  leadId         String   @map("lead_id") @db.Uuid
+  campaignRunId  String?  @map("campaign_run_id") @db.Uuid
+  provider       String
+  externalId     String   @map("external_id")
+  rawPayload     Json     @map("raw_payload")
+  collectedAt    DateTime @default(now()) @map("collected_at") @db.Timestamptz
+  lastSeenAt     DateTime @default(now()) @map("last_seen_at") @db.Timestamptz
+
+  lead        Lead         @relation(fields: [leadId], references: [id])
+  campaignRun CampaignRun? @relation(fields: [campaignRunId], references: [id])
+
+  @@unique([organizationId, provider, externalId])
+  @@index([leadId])
+  @@map("lead_sources")
+}
+
+model Lead {
+  id                 String    @id @db.Uuid
+  organizationId     String    @map("organization_id") @db.Uuid
+  legalName          String    @map("legal_name")
+  tradeName          String?   @map("trade_name")
+  category           String
+  categoriesRaw      String[]  @map("categories_raw")
+  addressLine        String?   @map("address_line")
+  city               String
+  cityNormalized     String    @map("city_normalized")
+  state              String?
+  country            String?
+  latitude           Float?
+  longitude          Float?
+  domain             String?
+  normalizedDomain   String?   @map("normalized_domain")
+  websiteUrl         String?   @map("website_url")
+  websiteStatus      String    @default("UNKNOWN") @map("website_status")
+  rating             Float?
+  reviewCount        Int?      @map("review_count")
+  crmStage           String    @default("NEW") @map("crm_stage")
+  currentScore       Int?      @map("current_score")
+  assignedUserId     String?   @map("assigned_user_id") @db.Uuid
+  nextActionAt       DateTime? @map("next_action_at") @db.Timestamptz
+  dataQualityStatus  String    @default("NEW") @map("data_quality_status")
+  reviewedAt         DateTime? @map("reviewed_at") @db.Timestamptz
+  mergedIntoId       String?   @map("merged_into_id") @db.Uuid
+  version            Int       @default(1)
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  assignedUser User?        @relation(fields: [assignedUserId], references: [id])
+  mergedInto   Lead?        @relation("LeadMerge", fields: [mergedIntoId], references: [id])
+  mergedLeads  Lead[]       @relation("LeadMerge")
+  sources      LeadSource[]
+  contacts     LeadContact[]
+
+  @@index([organizationId, crmStage, currentScore(sort: Desc), updatedAt(sort: Desc)])
+  @@index([organizationId, cityNormalized, category])
+  @@map("leads")
+}
+
+model LeadContact {
+  id                 String    @id @db.Uuid
+  leadId             String    @map("lead_id") @db.Uuid
+  type               String
+  value              String
+  normalizedValue    String    @map("normalized_value")
+  primaryContact     Boolean   @default(false) @map("primary_contact")
+  verificationStatus String    @default("UNVERIFIED") @map("verification_status")
+  sourceId           String?   @map("source_id") @db.Uuid
+  confidence         Float?
+  lastVerifiedAt     DateTime? @map("last_verified_at") @db.Timestamptz
+  deletedAt          DateTime? @map("deleted_at") @db.Timestamptz
+
+  lead Lead @relation(fields: [leadId], references: [id])
+
+  @@index([leadId])
+  @@map("lead_contacts")
+}
+
+// --- Operations (Job/Outbox) ----------------------------------------------
+
+model Job {
+  id             String   @id @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  type           String
+  status         String   @default("QUEUED")
+  idempotencyKey String?  @map("idempotency_key")
+  attemptCount   Int      @default(0) @map("attempt_count")
+  payload        Json
+  errorMessage   String?  @map("error_message")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([organizationId, type, idempotencyKey])
+  @@map("jobs")
+}
+
+model OutboxEvent {
+  id             String    @id @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  eventType      String    @map("event_type")
+  eventVersion   Int       @default(1) @map("event_version")
+  correlationId  String    @map("correlation_id")
+  causationId    String?   @map("causation_id")
+  payload        Json
+  status         String    @default("PENDING")
+  availableAt    DateTime  @default(now()) @map("available_at") @db.Timestamptz
+  publishedAt    DateTime? @map("published_at") @db.Timestamptz
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([status, availableAt])
+  @@map("outbox_events")
 }

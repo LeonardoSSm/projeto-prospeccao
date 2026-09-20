@@ -1,7 +1,10 @@
 .PHONY: up down logs ps migrate verify contract-test compose-test
 
 up:
-	docker compose --env-file .env.local up -d --build
+	# -V renova volumes anônimos (node_modules dos serviços em modo dev) — sem isso,
+	# o Compose reaproveita o volume antigo entre recriações e um `pnpm add` novo
+	# fica invisível dentro do container mesmo após rebuild da imagem.
+	docker compose --env-file .env.local up -d --build -V
 
 down:
 	docker compose down
