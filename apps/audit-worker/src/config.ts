@@ -1,6 +1,21 @@
 export const config = {
   rabbitmqUrl: process.env.RABBITMQ_URL ?? "amqp://localhost:5672",
   auditRequestedQueue: "prospector.audit.requested.v1",
+  auditRetryQueue: "prospector.audit.retry.v1",
+  auditDlq: "prospector.audit.dlq.v1",
+  auditCompletedQueue: "prospector.audit.completed.v1",
+  auditCompletedDlq: "prospector.audit.completed.dlq.v1",
   maxConcurrency: Number(process.env.AUDIT_MAX_CONCURRENCY ?? 2),
   timeoutMs: Number(process.env.AUDIT_TIMEOUT_MS ?? 90000),
+  maxAttempts: Number(process.env.AUDIT_MAX_ATTEMPTS ?? 3),
+  retryDelayMs: Number(process.env.AUDIT_RETRY_DELAY_MS ?? 15000),
+  maxRedirects: Number(process.env.AUDIT_MAX_REDIRECTS ?? 5),
+  maxResponseBytes: Number(process.env.AUDIT_MAX_RESPONSE_BYTES ?? 15 * 1024 * 1024),
+  s3: {
+    endpoint: process.env.S3_ENDPOINT ?? "http://localhost:9000",
+    bucket: process.env.S3_BUCKET ?? "prospector-artifacts",
+    accessKeyId: process.env.S3_ACCESS_KEY ?? "prospector",
+    secretAccessKey: process.env.S3_SECRET_KEY ?? "prospector123",
+    region: process.env.S3_REGION ?? "us-east-1",
+  },
 };

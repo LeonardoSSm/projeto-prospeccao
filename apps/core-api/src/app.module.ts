@@ -1,5 +1,6 @@
 import { MiddlewareConsumer, Module, type NestModule } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
+import { AuditingModule } from "./auditing/auditing.module";
 import { CampaignsModule } from "./campaigns/campaigns.module";
 import { CorrelationIdMiddleware } from "./common/middleware/correlation-id.middleware";
 import { OrgContextMiddleware } from "./common/middleware/org-context.middleware";
@@ -24,6 +25,7 @@ import { PrismaModule } from "./prisma/prisma.module";
     DiscoveryModule,
     CampaignsModule,
     ImportsModule,
+    AuditingModule,
   ],
 })
 export class AppModule implements NestModule {

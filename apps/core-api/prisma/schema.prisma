@@ -152,6 +152,7 @@ model Lead {
   mergedLeads  Lead[]       @relation("LeadMerge")
   sources      LeadSource[]
   contacts     LeadContact[]
+  snapshots    WebsiteSnapshot[]
 
   @@index([organizationId, crmStage, currentScore(sort: Desc), updatedAt(sort: Desc)])
   @@index([organizationId, cityNormalized, category])
@@ -175,6 +176,62 @@ model LeadContact {
 
   @@index([leadId])
   @@map("lead_contacts")
+}
+
+// --- Auditing (Fase 2) ------------------------------------------------------
+
+model WebsiteSnapshot {
+  id           String   @id @db.Uuid
+  leadId       String   @map("lead_id") @db.Uuid
+  requestedUrl String   @map("requested_url")
+  finalUrl     String?  @map("final_url")
+  httpStatus   Int?     @map("http_status")
+  contentHash  String?  @map("content_hash")
+  capturedAt   DateTime @default(now()) @map("captured_at") @db.Timestamptz
+
+  lead   Lead          @relation(fields: [leadId], references: [id])
+  audits WebsiteAudit[]
+
+  @@index([leadId, capturedAt(sort: Desc)])
+  @@map("website_snapshots")
+}
+
+model WebsiteAudit {
+  id                 String   @id @db.Uuid
+  websiteSnapshotId  String   @map("website_snapshot_id") @db.Uuid
+  status             String   @default("QUEUED")
+  engineVersion      String?  @map("engine_version")
+  performanceScore   Int?     @map("performance_score")
+  accessibilityScore Int?     @map("accessibility_score")
+  seoScore           Int?     @map("seo_score")
+  bestPracticesScore Int?     @map("best_practices_score")
+  technicalMetrics   Json?    @map("technical_metrics")
+  featuresDetected   Json?    @map("features_detected")
+  reportObjectKey    String?  @map("report_object_key")
+  screenshotObjectKey String? @map("screenshot_object_key")
+  failureReason      String?  @map("failure_reason")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  snapshot WebsiteSnapshot @relation(fields: [websiteSnapshotId], references: [id])
+  findings AuditFinding[]
+
+  @@index([websiteSnapshotId, createdAt(sort: Desc)])
+  @@map("website_audits")
+}
+
+model AuditFinding {
+  id             String @id @db.Uuid
+  websiteAuditId String @map("website_audit_id") @db.Uuid
+  code           String
+  severity       String
+  category       String
+  evidence       Json
+
+  audit WebsiteAudit @relation(fields: [websiteAuditId], references: [id])
+
+  @@index([websiteAuditId, severity, category])
+  @@index([code])
+  @@map("audit_findings")
 }
 
 // --- Operations (Job/Outbox) ----------------------------------------------

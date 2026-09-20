@@ -1,0 +1,40 @@
+// Forma do payload publicado pelo audit-worker em `prospector.audit.completed.v1`
+// (docs/DOCUMENTATION.md seção 4.10). Mantido em sincronia manualmente com
+// apps/audit-worker/src/audit/types.ts até existir geração de tipos a partir de
+// JSON Schema compartilhado (seção 7.4 do blueprint).
+export interface AuditFindingPayload {
+  code: string;
+  severity: string;
+  category: string;
+  evidence: Record<string, unknown>;
+}
+
+export interface AuditCompletedPayload {
+  auditRequestId: string;
+  leadId: string;
+  engineVersion: string;
+  finalUrl: string;
+  contentHash: string;
+  http: {
+    status: number;
+    https: boolean;
+    redirectCount: number;
+  };
+  lighthouse: {
+    performance: number | null;
+    accessibility: number | null;
+    seo: number | null;
+    bestPractices: number | null;
+    metrics: Record<string, unknown>;
+  };
+  features: Record<string, unknown>;
+  findings: AuditFindingPayload[];
+  reportObjectKey: string;
+  screenshotObjectKey: string;
+}
+
+export interface AuditFailedPayload {
+  auditRequestId: string;
+  leadId: string;
+  reason: string;
+}

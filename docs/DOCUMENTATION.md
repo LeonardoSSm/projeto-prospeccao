@@ -490,11 +490,16 @@ erDiagram
         uuid id PK
         uuid website_snapshot_id FK
         varchar status
+        varchar engine_version
         integer performance_score
         integer accessibility_score
         integer seo_score
         integer best_practices_score
         jsonb technical_metrics
+        jsonb features_detected
+        varchar report_object_key
+        varchar screenshot_object_key
+        timestamptz created_at
     }
     AUDIT_FINDINGS {
         uuid id PK
@@ -1264,8 +1269,12 @@ Filas:
 prospector.audit.requested.v1
 prospector.audit.retry.v1
 prospector.audit.dlq.v1
+prospector.audit.completed.v1
+prospector.audit.completed.dlq.v1
 prospector.integration-events.v1
 ```
+
+`audit.requested` vai do core-api para o audit-worker; `audit.completed` faz o caminho inverso (`website.audit.completed`/`website.audit.failed`), carregando scores, métricas, achados e as chaves dos artefatos no S3/MinIO. Cada uma tem sua própria fila porque o consumidor é um serviço específico em cada direção, não um observador genérico — diferente de `prospector.integration-events.v1`, que é o barramento genérico onde outros eventos de domínio (ex.: `campaign.run.requested`) são publicados para quem quiser observar.
 
 ### 4.15 Compatibilidade e versionamento
 
@@ -1639,6 +1648,7 @@ Critérios:
 | Score inesperado | versão e fatores persistidos | Comparar evidências com a política daquela versão |
 | Hot-reload não funciona | `compose.override.yaml` aplicado e volumes montados | Rodar `docker compose watch` em vez de `up -d` |
 | Dependência nova (`pnpm add`) não aparece no container | Volume anônimo de `node_modules` reaproveitado entre recriações | `docker compose up -d --build -V` (renova volumes anônimos; `make up` já faz isso) |
+| Mudança de código não aparece no container em modo dev | Docker Desktop no Windows nem sempre propaga eventos de arquivo de um bind mount para o watcher dentro do container | `docker compose restart <serviço>` força reler o código do zero, sem depender do watch |
 
 ## 7. Estratégia de Testes e Qualidade de Código
 
