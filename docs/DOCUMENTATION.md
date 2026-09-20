@@ -544,13 +544,19 @@ erDiagram
     }
     AI_ANALYSES {
         uuid id PK
+        uuid organization_id FK
         uuid lead_id FK
         varchar kind
+        varchar status
         varchar model_name
         varchar prompt_version
         jsonb input_snapshot
         jsonb output
         varchar review_status
+        integer tokens_used
+        integer latency_ms
+        float estimated_cost_usd
+        timestamptz created_at
     }
     PROPOSALS {
         uuid id PK
@@ -559,6 +565,8 @@ erDiagram
         varchar status
         text content
         uuid approved_by FK
+        timestamptz approved_at
+        timestamptz created_at
     }
     CRM_ACTIVITIES {
         uuid id PK

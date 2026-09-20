@@ -31,8 +31,9 @@ model User {
   displayName String   @map("display_name")
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  memberships   Membership[]
-  assignedLeads Lead[]
+  memberships       Membership[]
+  assignedLeads     Lead[]
+  approvedProposals Proposal[]
 
   @@map("users")
 }
@@ -154,6 +155,8 @@ model Lead {
   contacts     LeadContact[]
   snapshots    WebsiteSnapshot[]
   scores       LeadScore[]
+  aiAnalyses   AiAnalysis[]
+  proposals    Proposal[]
 
   @@index([organizationId, crmStage, currentScore(sort: Desc), updatedAt(sort: Desc)])
   @@index([organizationId, cityNormalized, category])
@@ -278,6 +281,61 @@ model ScoreFactor {
 
   @@index([leadScoreId])
   @@map("score_factors")
+}
+
+// --- Intelligence (Fase 4) ---------------------------------------------------
+
+model PromptTemplate {
+  id        String   @id @db.Uuid
+  kind      String
+  version   String   @unique
+  content   String
+  status    String   @default("ACTIVE")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("prompt_templates")
+}
+
+model AiAnalysis {
+  id               String    @id @db.Uuid
+  organizationId   String    @map("organization_id") @db.Uuid
+  leadId           String    @map("lead_id") @db.Uuid
+  kind             String
+  status           String    @default("QUEUED")
+  modelName        String?   @map("model_name")
+  // Referencia prompt_templates.version por rótulo, não por FK física — mesma
+  // convenção de score_policies (docs/DOCUMENTATION.md seção 3.3).
+  promptVersion    String?   @map("prompt_version")
+  inputSnapshot    Json      @map("input_snapshot")
+  output           Json?
+  reviewStatus     String    @default("PENDING_REVIEW") @map("review_status")
+  tokensUsed       Int?      @map("tokens_used")
+  latencyMs        Int?      @map("latency_ms")
+  estimatedCostUsd Float?    @map("estimated_cost_usd")
+  failureReason    String?   @map("failure_reason")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  lead Lead @relation(fields: [leadId], references: [id])
+
+  @@index([leadId, createdAt(sort: Desc)])
+  @@map("ai_analyses")
+}
+
+model Proposal {
+  id         String    @id @db.Uuid
+  leadId     String    @map("lead_id") @db.Uuid
+  revision   Int       @default(1)
+  status     String    @default("DRAFT")
+  content    String
+  approvedBy String?   @map("approved_by") @db.Uuid
+  approvedAt DateTime? @map("approved_at") @db.Timestamptz
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  lead     Lead  @relation(fields: [leadId], references: [id])
+  approver User? @relation(fields: [approvedBy], references: [id])
+
+  @@index([leadId, revision(sort: Desc)])
+  @@map("proposals")
 }
 
 // --- Operations (Job/Outbox) ----------------------------------------------

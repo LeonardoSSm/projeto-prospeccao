@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { uuidv7 } from "uuidv7";
 import { DEV_ORGANIZATION_ID } from "../src/common/constants";
+import { PROMPT_VERSION, SYSTEM_PROMPT } from "../src/intelligence/prompts/commercial-diagnosis-v3";
 import { POLICY_VERSION } from "../src/scoring/policies/policy-2026-09-v1";
 
 const prisma = new PrismaClient();
@@ -46,6 +47,19 @@ async function main(): Promise<void> {
     },
   });
   console.log(`Política de score pronta: ${policy.version}`);
+
+  const prompt = await prisma.promptTemplate.upsert({
+    where: { version: PROMPT_VERSION },
+    update: {},
+    create: {
+      id: uuidv7(),
+      kind: "COMMERCIAL_DIAGNOSIS",
+      version: PROMPT_VERSION,
+      content: SYSTEM_PROMPT,
+      status: "ACTIVE",
+    },
+  });
+  console.log(`Template de prompt pronto: ${prompt.version}`);
 }
 
 main()
