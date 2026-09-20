@@ -153,6 +153,7 @@ model Lead {
   sources      LeadSource[]
   contacts     LeadContact[]
   snapshots    WebsiteSnapshot[]
+  scores       LeadScore[]
 
   @@index([organizationId, crmStage, currentScore(sort: Desc), updatedAt(sort: Desc)])
   @@index([organizationId, cityNormalized, category])
@@ -232,6 +233,51 @@ model AuditFinding {
   @@index([websiteAuditId, severity, category])
   @@index([code])
   @@map("audit_findings")
+}
+
+// --- Scoring (Fase 3) --------------------------------------------------------
+
+model ScorePolicy {
+  id            String    @id @db.Uuid
+  version       String    @unique
+  description   String
+  factorsConfig Json      @map("factors_config")
+  effectiveFrom DateTime  @default(now()) @map("effective_from") @db.Timestamptz
+  effectiveTo   DateTime? @map("effective_to") @db.Timestamptz
+  status        String    @default("ACTIVE")
+
+  @@map("score_policies")
+}
+
+model LeadScore {
+  id            String   @id @db.Uuid
+  leadId        String   @map("lead_id") @db.Uuid
+  // Referencia score_policies.version por rótulo semântico, não por FK física
+  // (docs/DOCUMENTATION.md seção 3.3) — uma política vigente nunca é editada.
+  policyVersion String   @map("policy_version")
+  rawScore      Int      @map("raw_score")
+  totalScore    Int      @map("total_score")
+  band          String
+  calculatedAt  DateTime @default(now()) @map("calculated_at") @db.Timestamptz
+
+  lead    Lead          @relation(fields: [leadId], references: [id])
+  factors ScoreFactor[]
+
+  @@index([leadId, calculatedAt(sort: Desc)])
+  @@map("lead_scores")
+}
+
+model ScoreFactor {
+  id          String @id @db.Uuid
+  leadScoreId String @map("lead_score_id") @db.Uuid
+  factorCode  String @map("factor_code")
+  points      Int
+  evidence    Json
+
+  leadScore LeadScore @relation(fields: [leadScoreId], references: [id])
+
+  @@index([leadScoreId])
+  @@map("score_factors")
 }
 
 // --- Operations (Job/Outbox) ----------------------------------------------

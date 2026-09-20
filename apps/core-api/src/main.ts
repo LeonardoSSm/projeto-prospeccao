@@ -1,6 +1,7 @@
 import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
 import { HttpStatus, ValidationPipe, type ValidationError } from "@nestjs/common";
+import type { NestExpressApplication } from "@nestjs/platform-express";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { AppModule } from "./app.module";
 import { AppException } from "./common/exceptions/app.exception";
@@ -41,12 +42,17 @@ function toValidationException(errors: ValidationError[]): AppException {
 }
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS ?? "http://localhost:3000")
     .split(",")
     .map((origin) => origin.trim());
   app.enableCors({ origin: allowedOrigins, credentials: true });
+
+  // PATCH usa JSON Merge Patch (docs/DOCUMENTATION.md seção 4.1) — sem isto, o
+  // parser padrão do Express só entende Content-Type: application/json e
+  // descartaria o corpo de um PATCH enviado com o content-type correto.
+  app.useBodyParser("json", { type: ["application/json", "application/merge-patch+json"] });
 
   app.setGlobalPrefix("api/v1", { exclude: ["health"] });
   app.useGlobalFilters(new ProblemDetailsFilter());

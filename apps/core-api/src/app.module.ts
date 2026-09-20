@@ -12,6 +12,7 @@ import { JobsModule } from "./jobs/jobs.module";
 import { LeadsModule } from "./leads/leads.module";
 import { OutboxModule } from "./outbox/outbox.module";
 import { PrismaModule } from "./prisma/prisma.module";
+import { ScoringModule } from "./scoring/scoring.module";
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { PrismaModule } from "./prisma/prisma.module";
     OutboxModule,
     HealthModule,
     JobsModule,
+    ScoringModule,
     LeadsModule,
     DiscoveryModule,
     CampaignsModule,

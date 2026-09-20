@@ -8,6 +8,7 @@ const DLQ = "prospector.audit.completed.dlq.v1";
 
 interface ResultEnvelope {
   eventType: "website.audit.completed" | "website.audit.failed";
+  correlationId: string;
   payload: AuditCompletedPayload | AuditFailedPayload;
 }
 
@@ -54,9 +55,12 @@ export class AuditResultsConsumerService implements OnModuleInit, OnModuleDestro
     try {
       const envelope: ResultEnvelope = JSON.parse(message.content.toString());
       if (envelope.eventType === "website.audit.completed") {
-        await this.auditingService.applyCompleted(envelope.payload as AuditCompletedPayload);
+        await this.auditingService.applyCompleted(
+          envelope.payload as AuditCompletedPayload,
+          envelope.correlationId,
+        );
       } else if (envelope.eventType === "website.audit.failed") {
-        await this.auditingService.applyFailed(envelope.payload as AuditFailedPayload);
+        await this.auditingService.applyFailed(envelope.payload as AuditFailedPayload, envelope.correlationId);
       } else {
         this.logger.warn(`Tipo de evento desconhecido ignorado: ${(envelope as { eventType?: string }).eventType}`);
       }

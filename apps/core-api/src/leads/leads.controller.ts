@@ -1,12 +1,19 @@
-import { Controller, Get, Param, Query } from "@nestjs/common";
+import { Body, Controller, Get, Headers, Param, Patch, Query } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import type { Lead } from "@prisma/client";
 import { CurrentOrganizationId } from "../common/decorators/current-organization.decorator";
+import { bandFor } from "../scoring/policies/policy-2026-09-v1";
 import { ListLeadsQueryDto } from "./dto/list-leads.query.dto";
+import { UpdateLeadDto } from "./dto/update-lead.dto";
 import { LeadsService } from "./leads.service";
 
-// Formato de resposta alinhado a docs/DOCUMENTATION.md seção 4.8. `scoreBand` só
-// existe a partir da Fase 3 (Scoring) — por ora sempre null.
+function parseIfMatch(header: string | undefined): number | undefined {
+  if (!header) return undefined;
+  const value = Number(header.replace(/"/g, "").trim());
+  return Number.isFinite(value) ? value : undefined;
+}
+
+// Formato de resposta alinhado a docs/DOCUMENTATION.md seção 4.8.
 function toListItem(lead: Lead) {
   return {
     id: lead.id,
@@ -18,7 +25,7 @@ function toListItem(lead: Lead) {
     website: lead.websiteUrl,
     websiteStatus: lead.websiteStatus,
     currentScore: lead.currentScore,
-    scoreBand: null as string | null,
+    scoreBand: lead.currentScore == null ? null : bandFor(lead.currentScore),
     crmStage: lead.crmStage,
     nextActionAt: lead.nextActionAt,
     updatedAt: lead.updatedAt,
@@ -49,5 +56,15 @@ export class LeadsController {
   @Get(":id")
   findOne(@CurrentOrganizationId() organizationId: string, @Param("id") id: string) {
     return this.leadsService.findOne(organizationId, id);
+  }
+
+  @Patch(":id")
+  update(
+    @CurrentOrganizationId() organizationId: string,
+    @Param("id") id: string,
+    @Body() dto: UpdateLeadDto,
+    @Headers("if-match") ifMatch?: string,
+  ) {
+    return this.leadsService.update(organizationId, id, dto, parseIfMatch(ifMatch));
   }
 }

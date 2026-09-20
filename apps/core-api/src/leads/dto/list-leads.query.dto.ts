@@ -2,6 +2,7 @@ import { Transform } from "class-transformer";
 import { IsIn, IsInt, IsOptional, IsString, Max, Min } from "class-validator";
 
 const WEBSITE_STATUSES = ["NO_WEBSITE", "SOCIAL_ONLY", "HAS_WEBSITE", "SITE_UNREACHABLE", "UNKNOWN"];
+export const SCORE_BANDS = ["LOW", "REVIEW", "INTERESTING", "PRIORITY"];
 
 function toStringArray(value: unknown): string[] | undefined {
   if (value === undefined || value === null || value === "") return undefined;
@@ -25,6 +26,11 @@ export class ListLeadsQueryDto {
   @IsOptional()
   @Transform(({ value }) => toStringArray(value))
   crmStage?: string[];
+
+  @IsOptional()
+  @Transform(({ value }) => toStringArray(value))
+  @IsIn(SCORE_BANDS, { each: true })
+  scoreBand?: string[];
 
   @IsOptional()
   @IsString()

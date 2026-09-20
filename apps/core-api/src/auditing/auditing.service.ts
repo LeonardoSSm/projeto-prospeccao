@@ -5,6 +5,7 @@ import { IdService } from "../common/id.service";
 import { JobsService } from "../jobs/jobs.service";
 import { OutboxService } from "../outbox/outbox.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { ScoringService } from "../scoring/scoring.service";
 import type { CreateAuditRequestDto } from "./dto/create-audit-request.dto";
 import type { AuditCompletedPayload, AuditFailedPayload } from "./audit-results.types";
 
@@ -20,6 +21,7 @@ export class AuditingService {
     private readonly idService: IdService,
     private readonly outbox: OutboxService,
     private readonly jobsService: JobsService,
+    private readonly scoringService: ScoringService,
   ) {}
 
   private async requireLead(organizationId: string, leadId: string) {
@@ -96,7 +98,7 @@ export class AuditingService {
 
   // Chamado pelo consumidor RabbitMQ (audit-results.consumer.ts) quando o
   // audit-worker termina uma auditoria com sucesso.
-  async applyCompleted(payload: AuditCompletedPayload): Promise<void> {
+  async applyCompleted(payload: AuditCompletedPayload, correlationId: string): Promise<void> {
     const audit = await this.findAuditOrWarn(payload.auditRequestId);
     if (!audit) return;
 
@@ -143,9 +145,10 @@ export class AuditingService {
     });
 
     await this.completeRelatedJob(payload.auditRequestId);
+    await this.triggerScoring(payload.leadId, correlationId);
   }
 
-  async applyFailed(payload: AuditFailedPayload): Promise<void> {
+  async applyFailed(payload: AuditFailedPayload, correlationId: string): Promise<void> {
     const audit = await this.findAuditOrWarn(payload.auditRequestId);
     if (!audit) return;
 
@@ -159,6 +162,18 @@ export class AuditingService {
     });
     if (job) {
       await this.jobsService.markFailed(job.id, payload.reason);
+    }
+    // Site inalcançável também é evidência de score (fator SITE_UNREACHABLE).
+    await this.triggerScoring(payload.leadId, correlationId);
+  }
+
+  private async triggerScoring(leadId: string, correlationId: string): Promise<void> {
+    const lead = await this.prisma.lead.findUnique({ where: { id: leadId } });
+    if (!lead) return;
+    try {
+      await this.scoringService.calculateScore(lead.organizationId, leadId, correlationId);
+    } catch (error) {
+      this.logger.error(`Falha ao calcular score automaticamente para o lead ${leadId}`, error as Error);
     }
   }
 

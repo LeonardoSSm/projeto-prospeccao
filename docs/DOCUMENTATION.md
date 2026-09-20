@@ -522,6 +522,7 @@ erDiagram
         uuid id PK
         uuid lead_id FK
         varchar policy_version
+        integer raw_score
         integer total_score
         varchar band
         timestamptz calculated_at

@@ -1,10 +1,17 @@
-import { HttpStatus, Injectable } from "@nestjs/common";
+import { HttpStatus, Injectable, Logger } from "@nestjs/common";
 import type { Lead, Prisma } from "@prisma/client";
 import { IdService } from "../common/id.service";
 import { NormalizationService } from "../common/normalization.service";
 import { AppException } from "../common/exceptions/app.exception";
 import { PrismaService } from "../prisma/prisma.service";
+import { ScoringService } from "../scoring/scoring.service";
 import { DedupeService, type MatchKind } from "./dedupe.service";
+import type { UpdateLeadDto } from "./dto/update-lead.dto";
+
+// Leads sem evidência técnica (nenhuma auditoria pendente) já podem ser
+// pontuados assim que descobertos (docs/DOCUMENTATION.md seção 1.9: o
+// fluxograma pula direto de "Possui site? Não" para "Calcular score").
+const SCORABLE_WITHOUT_AUDIT = new Set(["NO_WEBSITE", "SOCIAL_ONLY"]);
 
 export interface UpsertLeadInput {
   organizationId: string;
@@ -40,12 +47,23 @@ export interface ListLeadsQuery {
   category?: string;
   websiteStatus?: string[];
   crmStage?: string[];
+  scoreBand?: string[];
   sort?: string;
   limit: number;
   cursor?: string;
 }
 
 const SORTABLE_FIELDS = new Set(["currentScore", "updatedAt", "tradeName", "rating", "reviewCount"]);
+
+// Faixas espelhando bandFor() em scoring/policies/policy-2026-09-v1.ts. Duplicado
+// aqui como range numérico (em vez de importar bandFor) porque o filtro precisa
+// virar SQL (WHERE current_score BETWEEN x AND y), não avaliar em memória.
+const BAND_RANGES: Record<string, { gte: number; lte: number }> = {
+  LOW: { gte: 0, lte: 30 },
+  REVIEW: { gte: 31, lte: 50 },
+  INTERESTING: { gte: 51, lte: 70 },
+  PRIORITY: { gte: 71, lte: 100 },
+};
 
 function parseSort(sort: string | undefined): Prisma.LeadOrderByWithRelationInput[] {
   if (!sort) return [{ updatedAt: "desc" }, { id: "desc" }];
@@ -73,11 +91,14 @@ export interface ListLeadsResult {
 
 @Injectable()
 export class LeadsService {
+  private readonly logger = new Logger(LeadsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly idService: IdService,
     private readonly normalization: NormalizationService,
     private readonly dedupe: DedupeService,
+    private readonly scoringService: ScoringService,
   ) {}
 
   // Ponto único de entrada de dados externos (conector de descoberta ou CSV): normaliza,
@@ -86,8 +107,9 @@ export class LeadsService {
     const normalizedDomain = this.normalization.domain(input.websiteUrl);
     const normalizedPhone = this.normalization.phone(input.phone);
     const cityNormalized = this.normalization.city(input.city);
+    const websiteStatus = input.websiteUrl ? "HAS_WEBSITE" : input.instagram ? "SOCIAL_ONLY" : "NO_WEBSITE";
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const match = await this.dedupe.findMatch(tx, {
         organizationId: input.organizationId,
         provider: input.provider,
@@ -121,11 +143,7 @@ export class LeadsService {
                   domain: normalizedDomain,
                   normalizedDomain,
                   websiteUrl: input.websiteUrl,
-                  websiteStatus: input.websiteUrl
-                    ? "HAS_WEBSITE"
-                    : input.instagram
-                      ? "SOCIAL_ONLY"
-                      : "NO_WEBSITE",
+                  websiteStatus,
                   rating: input.rating,
                   reviewCount: input.reviewCount,
                 },
@@ -170,6 +188,16 @@ export class LeadsService {
 
       return { leadId, matchKind: match.kind };
     });
+
+    if (result.matchKind === "NEW" && SCORABLE_WITHOUT_AUDIT.has(websiteStatus)) {
+      try {
+        await this.scoringService.calculateScore(input.organizationId, result.leadId, this.idService.generate());
+      } catch (error) {
+        this.logger.error(`Falha ao calcular score inicial para o lead ${result.leadId}`, error as Error);
+      }
+    }
+
+    return result;
   }
 
   private async upsertContact(
@@ -206,6 +234,9 @@ export class LeadsService {
       ...(query.category ? { category: query.category } : {}),
       ...(query.websiteStatus?.length ? { websiteStatus: { in: query.websiteStatus } } : {}),
       ...(query.crmStage?.length ? { crmStage: { in: query.crmStage } } : {}),
+      ...(query.scoreBand?.length
+        ? { OR: query.scoreBand.map((band) => ({ currentScore: BAND_RANGES[band] })) }
+        : {}),
     };
 
     const rows = await this.prisma.lead.findMany({
@@ -237,6 +268,56 @@ export class LeadsService {
       });
     }
     return lead;
+  }
+
+  // Concorrência otimista (docs/DOCUMENTATION.md seção 4.2/4.13): quando o
+  // chamador manda If-Match, o UPDATE só acontece se `version` ainda bater —
+  // checagem e escrita no MESMO comando SQL, sem janela de corrida entre
+  // "ler a versão" e "gravar" (diferente de um SELECT seguido de UPDATE).
+  async update(
+    organizationId: string,
+    id: string,
+    dto: UpdateLeadDto,
+    ifMatchVersion?: number,
+  ): Promise<Lead> {
+    const current = await this.prisma.lead.findFirst({ where: { id, organizationId } });
+    if (!current) {
+      throw new AppException(HttpStatus.NOT_FOUND, {
+        title: "Lead não encontrado",
+        errorCode: "LEAD_NOT_FOUND",
+      });
+    }
+
+    const data: Prisma.LeadUpdateInput = {
+      ...(dto.legalName !== undefined ? { legalName: dto.legalName } : {}),
+      ...(dto.tradeName !== undefined ? { tradeName: dto.tradeName } : {}),
+      ...(dto.category !== undefined ? { category: dto.category } : {}),
+      ...(dto.city !== undefined
+        ? { city: dto.city, cityNormalized: this.normalization.city(dto.city) }
+        : {}),
+      ...(dto.dataQualityStatus !== undefined
+        ? { dataQualityStatus: dto.dataQualityStatus, reviewedAt: new Date() }
+        : {}),
+      version: { increment: 1 },
+    };
+
+    if (ifMatchVersion !== undefined) {
+      const result = await this.prisma.lead.updateMany({
+        where: { id, organizationId, version: ifMatchVersion },
+        data,
+      });
+      if (result.count === 0) {
+        throw new AppException(HttpStatus.PRECONDITION_FAILED, {
+          title: "Versão desatualizada",
+          detail: "O lead foi modificado por outra operação. Releia o recurso e tente novamente.",
+          errorCode: "LEAD_VERSION_MISMATCH",
+        });
+      }
+    } else {
+      await this.prisma.lead.update({ where: { id }, data });
+    }
+
+    return this.findOne(organizationId, id);
   }
 }
 
