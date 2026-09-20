@@ -578,12 +578,18 @@ erDiagram
     }
     OUTREACH_MESSAGES {
         uuid id PK
+        uuid organization_id FK
         uuid lead_id FK
         varchar channel
         varchar status
         text content
+        varchar recipient_value
         uuid approved_by FK
+        varchar rejected_reason
+        varchar failure_reason
         timestamptz sent_at
+        timestamptz created_at
+        timestamptz updated_at
     }
     CONTACT_SUPPRESSIONS {
         uuid id PK

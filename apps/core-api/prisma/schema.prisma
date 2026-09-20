@@ -31,9 +31,10 @@ model User {
   displayName String   @map("display_name")
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  memberships       Membership[]
-  assignedLeads     Lead[]
-  approvedProposals Proposal[]
+  memberships             Membership[]
+  assignedLeads           Lead[]
+  approvedProposals       Proposal[]
+  approvedOutreachMessages OutreachMessage[]
 
   @@map("users")
 }
@@ -158,6 +159,7 @@ model Lead {
   aiAnalyses   AiAnalysis[]
   proposals    Proposal[]
   activities   CrmActivity[]
+  outreachMessages OutreachMessage[]
 
   @@index([organizationId, crmStage, currentScore(sort: Desc), updatedAt(sort: Desc)])
   @@index([organizationId, cityNormalized, category])
@@ -337,6 +339,49 @@ model Proposal {
 
   @@index([leadId, revision(sort: Desc)])
   @@map("proposals")
+}
+
+// --- Outreach (Fase 6) -----------------------------------------------------
+
+model OutreachMessage {
+  id              String    @id @db.Uuid
+  organizationId  String    @map("organization_id") @db.Uuid
+  leadId          String    @map("lead_id") @db.Uuid
+  channel         String
+  status          String    @default("PENDING_APPROVAL")
+  content         String
+  // Valor normalizado do destinatário no momento da criação — precisa
+  // sobreviver mesmo que o contato do lead mude depois, para a checagem de
+  // supressão em request-send refletir o que foi de fato aprovado.
+  recipientValue  String    @map("recipient_value")
+  approvedBy      String?   @map("approved_by") @db.Uuid
+  rejectedReason  String?   @map("rejected_reason")
+  failureReason   String?   @map("failure_reason")
+  sentAt          DateTime? @map("sent_at") @db.Timestamptz
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  lead     Lead  @relation(fields: [leadId], references: [id])
+  approver User? @relation(fields: [approvedBy], references: [id])
+
+  @@index([leadId, createdAt(sort: Desc)])
+  @@index([organizationId, status])
+  @@map("outreach_messages")
+}
+
+model ContactSuppression {
+  id                   String   @id @db.Uuid
+  organizationId       String   @map("organization_id") @db.Uuid
+  channel              String
+  // Hash do valor normalizado, nunca o valor em claro (docs/DOCUMENTATION.md
+  // seção 5.7 e 3.3) — suficiente para bloquear reimportação/novo contato sem
+  // reter o dado pessoal em si.
+  normalizedValueHash  String   @map("normalized_value_hash")
+  reason               String
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@unique([organizationId, channel, normalizedValueHash])
+  @@map("contact_suppressions")
 }
 
 // --- CRM (Fase 5) --------------------------------------------------------

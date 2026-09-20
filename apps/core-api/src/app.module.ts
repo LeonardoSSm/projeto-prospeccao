@@ -13,6 +13,7 @@ import { IntelligenceModule } from "./intelligence/intelligence.module";
 import { JobsModule } from "./jobs/jobs.module";
 import { LeadsModule } from "./leads/leads.module";
 import { OutboxModule } from "./outbox/outbox.module";
+import { OutreachModule } from "./outreach/outreach.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { ScoringModule } from "./scoring/scoring.module";
 
@@ -32,6 +33,7 @@ import { ScoringModule } from "./scoring/scoring.module";
     AuditingModule,
     IntelligenceModule,
     CrmModule,
+    OutreachModule,
   ],
 })
 export class AppModule implements NestModule {
